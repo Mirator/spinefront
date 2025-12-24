@@ -1,4 +1,19 @@
 export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => false, onStart, onToggleMenu }) {
+  const upJumpSources = new Set();
+
+  const engageUpJump = (source) => {
+    upJumpSources.add(source);
+    input.up = true;
+    input.jump = true;
+  };
+
+  const releaseUpJump = (source) => {
+    upJumpSources.delete(source);
+    const active = upJumpSources.size > 0;
+    input.up = active;
+    input.jump = active;
+  };
+
   const keydown = (e) => {
     if (e.code === 'Escape' && typeof onToggleMenu === 'function') {
       onToggleMenu();
@@ -15,23 +30,27 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
       return;
     }
     if (isEnded()) return;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+      engageUpJump(e.code);
+      return;
+    }
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
-    if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = true;
     if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = true;
-    if (e.code === 'Space') input.jump = true;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = true;
     if (e.code === 'KeyF') input.attack = true;
     if (e.code === 'KeyE') input.interact = true;
   };
 
   const keyup = (e) => {
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+      releaseUpJump(e.code);
+      return;
+    }
     if (isEnded()) return;
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
-    if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = false;
     if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = false;
-    if (e.code === 'Space') input.jump = false;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = false;
     if (e.code === 'KeyF') input.attack = false;
     if (e.code === 'KeyE') input.interact = false;
@@ -43,9 +62,9 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
   const touchControls = [
     { id: 'control-left', onStart: () => (input.left = true), onEnd: () => (input.left = false), ignoreEnded: true },
     { id: 'control-right', onStart: () => (input.right = true), onEnd: () => (input.right = false), ignoreEnded: true },
-    { id: 'control-up', onStart: () => (input.up = true), onEnd: () => (input.up = false), ignoreEnded: true },
+    { id: 'control-up', onStart: () => engageUpJump('control-up'), onEnd: () => releaseUpJump('control-up'), ignoreEnded: true },
     { id: 'control-down', onStart: () => (input.down = true), onEnd: () => (input.down = false), ignoreEnded: true },
-    { id: 'control-jump', onStart: () => (input.jump = true), onEnd: () => (input.jump = false), ignoreEnded: true },
+    { id: 'control-jump', onStart: () => engageUpJump('control-jump'), onEnd: () => releaseUpJump('control-jump'), ignoreEnded: true },
     { id: 'control-attack', onStart: () => (input.attack = true), onEnd: () => (input.attack = false), ignoreEnded: true },
     { id: 'control-interact', onStart: () => (input.interact = true), onEnd: () => (input.interact = false), ignoreEnded: true },
     { id: 'control-restart', onStart: () => onReset(), onEnd: () => {}, autoRelease: true },
