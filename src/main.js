@@ -84,8 +84,11 @@ const controlsCleanup = bindDomControls({
 
 function handlePointer(event) {
   const regions = renderer.getInteractiveRegions();
-  const x = event.offsetX;
-  const y = event.offsetY;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (event.clientX - rect.left) * scaleX;
+  const y = (event.clientY - rect.top) * scaleY;
 
   const inside = (rect) => rect && x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
 
