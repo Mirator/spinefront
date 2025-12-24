@@ -181,41 +181,6 @@ export function createRenderer({ canvas, fxLayer, canvasWrap, hud, colors = COLO
     const { state, world, player, shrine } = snapshot;
     hud.innerHTML = '';
     const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
-    const dayRatio = clamp(state.dayTimer / world.dayLength, 0, 1);
-    const waveRatio = state.isNight && state.waveInterval > 0 ? clamp(state.waveTimer / state.waveInterval, 0, 1) : 0;
-
-    const cycleTag = document.createElement('span');
-    cycleTag.className = 'tag tag-bar';
-    cycleTag.innerHTML = `<strong>Cycle:</strong> ${state.isNight ? 'Night' : 'Day'}`;
-    const cycleBar = document.createElement('div');
-    cycleBar.className = 'progress';
-    const cycleFill = document.createElement('div');
-    cycleFill.className = 'progress-fill';
-    cycleFill.style.width = `${dayRatio * 100}%`;
-    const cycleDayColor = lerpColor('#fbbf24', '#22d3ee', state.skyBlend);
-    const cycleNightColor = lerpColor('#0ea5e9', '#6366f1', state.skyBlend);
-    cycleFill.style.background = `linear-gradient(90deg, ${cycleDayColor}, ${cycleNightColor})`;
-    cycleBar.appendChild(cycleFill);
-    const cycleNote = document.createElement('div');
-    cycleNote.className = 'progress-label';
-    cycleNote.textContent = `${Math.floor(state.dayTimer)}s / ${world.dayLength}s`;
-    cycleBar.appendChild(cycleNote);
-    cycleTag.appendChild(cycleBar);
-    hud.appendChild(cycleTag);
-
-    if (state.isNight) {
-      const waveTag = document.createElement('span');
-      waveTag.className = 'tag tag-bar warn';
-      waveTag.innerHTML = `<strong>Next wave:</strong> ${Math.max(0, state.waveTimer).toFixed(1)}s`;
-      const waveBar = document.createElement('div');
-      waveBar.className = 'progress thin';
-      const waveFill = document.createElement('div');
-      waveFill.className = 'progress-fill warn';
-      waveFill.style.width = `${waveRatio * 100}%`;
-      waveBar.appendChild(waveFill);
-      waveTag.appendChild(waveBar);
-      hud.appendChild(waveTag);
-    }
 
     const tags = [
       { label: 'Nights', value: `${state.nightsSurvived}/${world.nightsToWin}` },
