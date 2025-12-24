@@ -18,6 +18,10 @@ function drawRoundedRect(ctx, x, y, w, h, r = 12) {
 
 export function createRenderer({ canvas, colors = COLORS }) {
   const ctx = canvas.getContext('2d');
+  const interactiveRegions = {
+    menuToggle: null,
+    menuStart: null,
+  };
 
   function drawPlayer(player) {
     ctx.fillStyle = colors.player;
@@ -247,9 +251,36 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
+  function drawMenuToggle(state) {
+    const paddingX = 12;
+    const paddingY = 9;
+    const text = state.menuOpen ? 'Close menu' : 'Menu';
+    ctx.save();
+    ctx.font = '14px Inter, system-ui, sans-serif';
+    const textWidth = ctx.measureText(text).width;
+    const w = textWidth + paddingX * 2;
+    const h = 34;
+    const x = 14;
+    const y = 14;
+    interactiveRegions.menuToggle = { x, y, w, h };
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.8)';
+    ctx.strokeStyle = state.menuOpen ? 'rgba(251, 191, 36, 0.8)' : 'rgba(59, 130, 246, 0.65)';
+    ctx.lineWidth = 1.5;
+    drawRoundedRect(ctx, x, y, w, h, 16);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = state.menuOpen ? '#fbbf24' : '#bfdbfe';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + paddingX, y + h / 2);
+    ctx.restore();
+  }
+
   function drawMenuOverlay(snapshot) {
     const { state } = snapshot;
-    if (!state.menuOpen) return;
+    if (!state.menuOpen) {
+      interactiveRegions.menuStart = null;
+      return;
+    }
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -291,12 +322,26 @@ export function createRenderer({ canvas, colors = COLORS }) {
       ctx.fillText(`• ${line}`, panelX + 18, panelY + 96 + idx * 18);
     });
 
-    ctx.fillStyle = '#e5e7eb';
     const startLabel = state.menuStartLabel || 'Start run';
+    const buttonWidth = Math.max(190, ctx.measureText(startLabel).width + 32);
+    const buttonHeight = 42;
+    const buttonX = panelX + panelWidth - buttonWidth - 18;
+    const buttonY = panelY + panelHeight - buttonHeight - 18;
+    interactiveRegions.menuStart = { x: buttonX, y: buttonY, w: buttonWidth, h: buttonHeight };
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.85)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    drawRoundedRect(ctx, buttonX, buttonY, buttonWidth, buttonHeight, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#f9fafb';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(startLabel, buttonX + 16, buttonY + buttonHeight / 2);
+
+    ctx.fillStyle = '#e5e7eb';
     const actions = [
-      `${startLabel}: Enter / Space`,
       'Open/close menu: Esc',
       'Restart: R',
+      'Tap buttons on canvas on mobile',
     ];
     actions.forEach((line, idx) => {
       ctx.fillText(line, panelX + 18, panelY + 178 + idx * 18);
@@ -368,10 +413,15 @@ export function createRenderer({ canvas, colors = COLORS }) {
 
     // UI layer (stable)
     drawHUD(snapshot);
+    drawMenuToggle(state);
     drawHelpBar();
     drawOutcome(state, world);
     drawMenuOverlay(snapshot);
   }
 
-  return { render: draw };
+  function getInteractiveRegions() {
+    return { ...interactiveRegions };
+  }
+
+  return { render: draw, getInteractiveRegions };
 }

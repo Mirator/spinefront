@@ -82,6 +82,23 @@ const controlsCleanup = bindDomControls({
   onToggleMenu: () => toggleMenu('paused'),
 });
 
+function handlePointer(event) {
+  const regions = renderer.getInteractiveRegions();
+  const x = event.offsetX;
+  const y = event.offsetY;
+
+  const inside = (rect) => rect && x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+
+  if (inside(regions.menuToggle)) {
+    toggleMenu('paused');
+    return;
+  }
+
+  if (store.state.menuOpen && inside(regions.menuStart)) {
+    startFromMenu();
+  }
+}
+
 function resizeCanvas() {
   const maxWidth = window.innerWidth - 20;
   const maxHeight = window.innerHeight - 20;
@@ -182,3 +199,5 @@ requestAnimationFrame(loop);
 window.addEventListener('beforeunload', () => {
   controlsCleanup();
 });
+
+canvas.addEventListener('pointerdown', handlePointer);
