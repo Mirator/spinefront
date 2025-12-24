@@ -208,3 +208,5 @@ requestAnimationFrame(loop);
 window.addEventListener('beforeunload', () => {
   controlsCleanup();
 });
+
+canvas.addEventListener('pointerdown', handlePointer);
