@@ -1,0 +1,441 @@
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const WORLD = {
+  width: canvas.width,
+  height: canvas.height,
+  ground: canvas.height - 80,
+  gravity: 1800,
+  dayLength: 30, // seconds per day cycle
+  nightsToWin: 3,
+};
+
+const input = {
+  left: false,
+  right: false,
+  up: false,
+  down: false,
+  jump: false,
+  sprint: false,
+  attack: false,
+  interact: false,
+};
+
+const state = {
+  time: 0,
+  dayTimer: 0,
+  isNight: false,
+  nightsSurvived: 0,
+  currency: 10,
+  crownLost: false,
+  shrineUnlocked: false,
+  entities: [],
+  enemies: [],
+  projectiles: [],
+  hudText: '',
+  waveTimer: 0,
+};
+
+const colors = {
+  player: '#fbbf24',
+  playerEye: '#111827',
+  wall: '#9ca3af',
+  tower: '#60a5fa',
+  enemy: '#f87171',
+  shrine: '#34d399',
+  crown: '#fcd34d',
+};
+
+function createPlayer() {
+  return {
+    type: 'player',
+    x: 120,
+    y: WORLD.ground - 40,
+    w: 28,
+    h: 40,
+    vx: 0,
+    vy: 0,
+    speed: 220,
+    sprintSpeed: 340,
+    jumpForce: 650,
+    onGround: false,
+    onLadder: false,
+    facing: 1,
+    attackCooldown: 0.4,
+    attackTimer: 0,
+    crown: true,
+  };
+}
+
+function createWall(x) {
+  return {
+    type: 'wall',
+    x,
+    y: WORLD.ground - 60,
+    w: 40,
+    h: 60,
+    hp: 120,
+    maxHp: 120,
+  };
+}
+
+function createTower(x) {
+  return {
+    type: 'tower',
+    x,
+    y: WORLD.ground - 90,
+    w: 36,
+    h: 90,
+    hp: 160,
+    maxHp: 160,
+    fireRate: 1.4,
+    fireTimer: 0,
+  };
+}
+
+function createShrine() {
+  return {
+    type: 'shrine',
+    x: WORLD.width / 2 - 25,
+    y: WORLD.ground - 50,
+    w: 50,
+    h: 50,
+  };
+}
+
+function createEnemy(side) {
+  const spawnPadding = 80;
+  const x = side === 'left' ? -spawnPadding : WORLD.width + spawnPadding;
+  return {
+    type: 'enemy',
+    x,
+    y: WORLD.ground - 36,
+    w: 28,
+    h: 36,
+    vx: side === 'left' ? 65 : -65,
+    speed: 65,
+    attack: 12,
+    attackRate: 1,
+    attackTimer: 0,
+    target: null,
+    hp: 50,
+  };
+}
+
+const player = createPlayer();
+const shrine = createShrine();
+const walls = [createWall(260), createWall(640)];
+const towers = [createTower(280), createTower(620)];
+
+state.entities.push(player, shrine, ...walls, ...towers);
+
+function overlaps(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function clamp(val, min, max) {
+  return Math.max(min, Math.min(max, val));
+}
+
+function handleInput(dt) {
+  player.onLadder = player.x + player.w / 2 > shrine.x - 8 && player.x + player.w / 2 < shrine.x + shrine.w + 8;
+  const accel = input.sprint ? player.sprintSpeed : player.speed;
+  player.vx = 0;
+  if (input.left) {
+    player.vx = -accel;
+    player.facing = -1;
+  } else if (input.right) {
+    player.vx = accel;
+    player.facing = 1;
+  }
+
+  if (player.onLadder && (input.up || input.down)) {
+    player.vy = (input.up ? -1 : 1) * 160;
+  } else if (player.onGround && input.jump) {
+    player.vy = -player.jumpForce;
+    player.onGround = false;
+  }
+
+  if (input.attack && player.attackTimer <= 0) {
+    swingSword();
+    player.attackTimer = player.attackCooldown;
+  }
+
+  if (input.interact && player.onLadder && !state.shrineUnlocked && state.currency >= 10) {
+    state.currency -= 10;
+    state.shrineUnlocked = true;
+    state.hudText = 'Shrine tech unlocked! Towers shoot faster.';
+    towers.forEach((t) => (t.fireRate = Math.max(0.7, t.fireRate * 0.75)));
+  }
+
+  player.attackTimer = Math.max(0, player.attackTimer - dt);
+}
+
+function swingSword() {
+  const arc = { x: player.x + (player.facing > 0 ? player.w : -24), y: player.y, w: 32, h: player.h };
+  state.enemies.forEach((enemy) => {
+    if (overlaps(arc, enemy)) {
+      enemy.hp -= 25;
+    }
+  });
+}
+
+function updatePlayer(dt) {
+  if (!player.onLadder) {
+    player.vy += WORLD.gravity * dt;
+  }
+
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  player.x = clamp(player.x, 40, WORLD.width - player.w - 40);
+
+  if (player.y + player.h >= WORLD.ground) {
+    player.y = WORLD.ground - player.h;
+    player.vy = 0;
+    player.onGround = true;
+  } else {
+    player.onGround = false;
+  }
+}
+
+function updateEnemies(dt) {
+  const targets = [...walls, ...towers];
+  state.enemies.forEach((e) => {
+    if (e.hp <= 0) return;
+    if (!e.target || e.target.hp <= 0) {
+      e.target = targets.find((t) => t.hp > 0 && Math.abs(t.x - e.x) < 400);
+    }
+    if (e.target && e.target.hp > 0) {
+      const dir = Math.sign(e.target.x - e.x);
+      e.vx = dir * e.speed;
+      e.x += e.vx * dt;
+      if (overlaps(e, e.target)) {
+        e.attackTimer -= dt;
+        if (e.attackTimer <= 0) {
+          e.target.hp -= e.attack;
+          e.attackTimer = 1 / e.attackRate;
+        }
+      }
+    } else {
+      e.x += e.vx * dt;
+    }
+  });
+}
+
+function updateTowers(dt) {
+  towers.forEach((tower) => {
+    if (tower.hp <= 0) return;
+    tower.fireTimer -= dt;
+    if (tower.fireTimer <= 0) {
+      const target = state.enemies.find((e) => e.hp > 0 && Math.abs(e.x - tower.x) < 320);
+      if (target) {
+        target.hp -= 18;
+        tower.fireTimer = tower.fireRate;
+      }
+    }
+  });
+}
+
+function spawnEnemies(dt) {
+  state.waveTimer -= dt;
+  if (state.waveTimer <= 0 && state.isNight) {
+    const side = Math.random() > 0.5 ? 'left' : 'right';
+    state.enemies.push(createEnemy(side));
+    state.waveTimer = Math.max(1.5, 3.5 - state.nightsSurvived);
+  }
+}
+
+function handleCollisions() {
+  state.enemies.forEach((e) => {
+    if (e.hp <= 0) return;
+    if (overlaps(e, player)) {
+      player.crown = false;
+      state.crownLost = true;
+    }
+  });
+}
+
+function cleanup() {
+  state.enemies = state.enemies.filter((e) => e.hp > 0 && e.x > -120 && e.x < WORLD.width + 120);
+}
+
+function updateDayNight(dt) {
+  state.dayTimer += dt;
+  if (state.dayTimer >= WORLD.dayLength) {
+    state.dayTimer = 0;
+    state.isNight = !state.isNight;
+    if (state.isNight) {
+      state.nightsSurvived += 1;
+      state.currency += 5;
+      state.hudText = `Night ${state.nightsSurvived} begins.`;
+    } else {
+      state.currency += 10;
+      state.hudText = `Sunrise! You earned income.`;
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const skyTop = state.isNight ? '#0b1221' : '#1e3a8a';
+  const skyBottom = state.isNight ? '#0f172a' : '#0b1221';
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, skyTop);
+  gradient.addColorStop(1, skyBottom);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#0c3a2f';
+  ctx.fillRect(0, WORLD.ground, canvas.width, canvas.height - WORLD.ground);
+  ctx.fillStyle = '#164e3b';
+  ctx.fillRect(0, WORLD.ground + 26, canvas.width, 16);
+
+  drawShrine();
+  drawStructures();
+  drawPlayer();
+  drawEnemies();
+  drawHUD();
+}
+
+function drawPlayer() {
+  ctx.fillStyle = colors.player;
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.fillStyle = colors.playerEye;
+  ctx.fillRect(player.x + (player.facing > 0 ? player.w - 10 : 4), player.y + 10, 6, 6);
+  if (player.crown) {
+    ctx.fillStyle = colors.crown;
+    ctx.fillRect(player.x + player.w / 2 - 8, player.y - 8, 16, 8);
+  }
+}
+
+function drawStructures() {
+  walls.forEach((wall) => {
+    ctx.fillStyle = wall.hp > 0 ? colors.wall : '#374151';
+    ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+    drawHpBar(wall);
+  });
+  towers.forEach((tower) => {
+    ctx.fillStyle = tower.hp > 0 ? colors.tower : '#1f2937';
+    ctx.fillRect(tower.x, tower.y, tower.w, tower.h);
+    drawHpBar(tower);
+  });
+}
+
+function drawShrine() {
+  ctx.fillStyle = state.shrineUnlocked ? '#65f2c6' : colors.shrine;
+  ctx.fillRect(shrine.x, shrine.y, shrine.w, shrine.h);
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(shrine.x + 8, shrine.y + 8, shrine.w - 16, shrine.h - 16);
+}
+
+function drawEnemies() {
+  state.enemies.forEach((e) => {
+    if (e.hp <= 0) return;
+    ctx.fillStyle = colors.enemy;
+    ctx.fillRect(e.x, e.y, e.w, e.h);
+  });
+}
+
+function drawHpBar(entity) {
+  const ratio = clamp(entity.hp / entity.maxHp, 0, 1);
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(entity.x, entity.y - 8, entity.w, 6);
+  ctx.fillStyle = ratio > 0.5 ? '#34d399' : '#fbbf24';
+  ctx.fillRect(entity.x, entity.y - 8, entity.w * ratio, 6);
+}
+
+function drawHUD() {
+  const hud = document.getElementById('hud');
+  hud.innerHTML = '';
+  const tags = [
+    { label: 'Day/Night', value: state.isNight ? 'Night' : 'Day' },
+    { label: 'Cycle', value: `${Math.floor(state.dayTimer)}s / ${WORLD.dayLength}s` },
+    { label: 'Nights', value: `${state.nightsSurvived}/${WORLD.nightsToWin}` },
+    { label: 'Gold', value: state.currency },
+    { label: 'Crown', value: player.crown ? 'Safe' : 'Lost' },
+    { label: 'Shrine', value: state.shrineUnlocked ? 'Unlocked' : 'Locked (E)' },
+    { label: 'Walls', value: walls.map((w) => Math.max(0, Math.floor(w.hp))).join(' / ') },
+    { label: 'Towers', value: towers.map((t) => Math.max(0, Math.floor(t.hp))).join(' / ') },
+  ];
+  tags.forEach((tag) => {
+    const el = document.createElement('span');
+    el.className = 'tag';
+    el.innerHTML = `<strong>${tag.label}:</strong> ${tag.value}`;
+    hud.appendChild(el);
+  });
+  if (state.hudText) {
+    const notice = document.createElement('span');
+    notice.className = 'tag';
+    notice.textContent = state.hudText;
+    hud.appendChild(notice);
+  }
+
+  if (state.crownLost) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f87171';
+    ctx.font = '32px Inter, sans-serif';
+    ctx.fillText('Crown lost! You were overrun.', canvas.width / 2 - 180, canvas.height / 2);
+  } else if (state.nightsSurvived >= WORLD.nightsToWin) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#34d399';
+    ctx.font = '32px Inter, sans-serif';
+    ctx.fillText('Victory! Dawn rises and you endure.', canvas.width / 2 - 210, canvas.height / 2);
+  }
+}
+
+function gameStep(dt) {
+  if (state.crownLost || state.nightsSurvived >= WORLD.nightsToWin) return draw();
+  handleInput(dt);
+  updatePlayer(dt);
+  updateEnemies(dt);
+  updateTowers(dt);
+  spawnEnemies(dt);
+  handleCollisions();
+  cleanup();
+  updateDayNight(dt);
+  draw();
+}
+
+let accumulator = 0;
+const fixedDelta = 1 / 60;
+let last = performance.now();
+
+function loop(now) {
+  const frame = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  accumulator += frame;
+  while (accumulator >= fixedDelta) {
+    gameStep(fixedDelta);
+    accumulator -= fixedDelta;
+    state.time += fixedDelta;
+  }
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = true;
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = true;
+  if (e.code === 'Space') input.jump = true;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = true;
+  if (e.code === 'KeyF') input.attack = true;
+  if (e.code === 'KeyE') input.interact = true;
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = false;
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = false;
+  if (e.code === 'Space') input.jump = false;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = false;
+  if (e.code === 'KeyF') input.attack = false;
+  if (e.code === 'KeyE') input.interact = false;
+});
+
+draw();
+requestAnimationFrame(loop);
