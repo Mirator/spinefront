@@ -22,13 +22,27 @@ describe('game logic systems', () => {
     expect(state.isNight).toBe(false);
     expect(state.currency).toBe(ECONOMY.dayIncome * 2 + ECONOMY.nightIncome);
 
-    state.nightsSurvived = world.nightsToWin;
-    const result = checkEndConditions(state, world);
-    expect(result).toBe('win');
-
     state.crownLost = true;
     const loss = checkEndConditions(state, world);
     expect(loss).toBe('loss');
+  });
+
+  it('wins only after surviving a full night', () => {
+    const store = createGameStore();
+    const { state, world } = store;
+    world.nightsToWin = 1;
+
+    state.dayTimer = world.dayLength;
+    updateDayNight(state, world, 0);
+    expect(state.isNight).toBe(true);
+    expect(state.nightsSurvived).toBe(0);
+    expect(checkEndConditions(state, world)).toBeNull();
+
+    state.dayTimer = world.dayLength;
+    updateDayNight(state, world, 0);
+    expect(state.isNight).toBe(false);
+    expect(state.nightsSurvived).toBe(1);
+    expect(checkEndConditions(state, world)).toBe('win');
   });
 
   it('spawns enemies on a night timer', () => {
