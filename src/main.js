@@ -18,6 +18,8 @@ import { updateDayNight, checkEndConditions } from './systems/cycle.js';
 import { updateEnemySpawns } from './systems/spawning.js';
 
 const canvas = document.getElementById('game');
+const menuToggleButton = document.getElementById('menu-toggle');
+const menuStartButton = document.getElementById('menu-start');
 
 const store = createGameStore({ width: canvas.width, height: canvas.height });
 
@@ -28,6 +30,7 @@ function resetGame() {
   store.state.menuOpen = false;
   store.state.paused = false;
   renderer.render(snapshot());
+  syncMenuButtons();
 }
 
 function updateMenu(reason = 'paused') {
@@ -41,6 +44,7 @@ function updateMenu(reason = 'paused') {
   store.state.menuStatus = headline;
   store.state.menuMessage = detail;
   store.state.menuStartLabel = startLabel;
+  syncMenuButtons();
 }
 
 function openMenu(reason = 'paused') {
@@ -48,6 +52,7 @@ function openMenu(reason = 'paused') {
   store.state.paused = true;
   resetInputState(store.input);
   updateMenu(reason);
+  syncMenuButtons();
 }
 
 function closeMenu() {
@@ -55,6 +60,7 @@ function closeMenu() {
   store.state.paused = false;
   store.state.hasStarted = true;
   updateMenu();
+  syncMenuButtons();
 }
 
 function startFromMenu(reset = false) {
@@ -81,6 +87,22 @@ const controlsCleanup = bindDomControls({
   onStart: () => startFromMenu(),
   onToggleMenu: () => toggleMenu('paused'),
 });
+
+function syncMenuButtons() {
+  if (menuToggleButton) {
+    menuToggleButton.setAttribute('aria-pressed', store.state.menuOpen ? 'true' : 'false');
+    menuToggleButton.textContent = store.state.menuOpen ? 'Close menu' : 'Menu';
+  }
+
+  if (menuStartButton) {
+    if (store.state.menuOpen) {
+      menuStartButton.hidden = false;
+      menuStartButton.textContent = store.state.menuStartLabel || 'Start run';
+    } else {
+      menuStartButton.hidden = true;
+    }
+  }
+}
 
 function resizeCanvas() {
   const maxWidth = window.innerWidth - 20;
@@ -176,6 +198,10 @@ resizeCanvas();
 renderer.render(snapshot());
 openMenu('intro');
 updateMenu('intro');
+syncMenuButtons();
+
+menuToggleButton?.addEventListener('click', () => toggleMenu('paused'));
+menuStartButton?.addEventListener('click', () => startFromMenu());
 
 requestAnimationFrame(loop);
 
