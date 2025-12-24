@@ -127,13 +127,49 @@ h1 {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 50px rgba(0, 0, 0, 0.28);
 }
 
+.canvas-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  transition: transform 0.04s ease;
+}
+
 canvas {
   width: 100%;
   height: auto;
+  display: block;
   border-radius: 14px;
   background: linear-gradient(180deg, #1f2937 0%, #0b1221 100%);
   border: 1px solid rgba(255, 255, 255, 0.05);
   image-rendering: crisp-edges;
+}
+
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 14px;
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+
+.hit-flash {
+  position: absolute;
+  width: 18px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.65);
+  transform-origin: center;
+}
+
+.vignette {
+  position: absolute;
+  inset: -6px;
+  background: radial-gradient(circle at 50% 50%, rgba(248, 113, 113, 0), rgba(248, 113, 113, 0.26) 55%, rgba(15, 23, 42, 0.7));
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.08s ease-out;
 }
 
 .help {
