@@ -50,6 +50,7 @@ const state = {
   waveTimer: 0,
   waveInterval: 0,
   effects: createEffectsState(),
+  skyBlend: 0,
 };
 
 const colors = {
@@ -151,6 +152,28 @@ function overlaps(a, b) {
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '');
+  const num = parseInt(clean, 16);
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+}
+
+function lerpColor(a, b, t) {
+  const ca = hexToRgb(a);
+  const cb = hexToRgb(b);
+  return `rgb(${Math.round(lerp(ca.r, cb.r, t))}, ${Math.round(lerp(ca.g, cb.g, t))}, ${Math.round(
+    lerp(ca.b, cb.b, t),
+  )})`;
 }
 
 function addHitFlash(x, y) {
@@ -414,21 +437,41 @@ function updateDayNight(dt) {
       state.hudText = `Sunrise! You earned income.`;
     }
   }
+
+  const targetBlend = state.isNight ? 1 : 0;
+  const transitionSeconds = WORLD.dayLength * 0.35;
+  const step = dt / transitionSeconds;
+  if (state.skyBlend < targetBlend) {
+    state.skyBlend = Math.min(targetBlend, state.skyBlend + step);
+  } else if (state.skyBlend > targetBlend) {
+    state.skyBlend = Math.max(targetBlend, state.skyBlend - step);
+  }
 }
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const skyTop = state.isNight ? '#0b1221' : '#1e3a8a';
-  const skyBottom = state.isNight ? '#0f172a' : '#0b1221';
+  const skyTop = lerpColor('#78bef5', '#0c1324', state.skyBlend);
+  const skyBottom = lerpColor('#1e3a8a', '#0f172a', state.skyBlend);
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gradient.addColorStop(0, skyTop);
   gradient.addColorStop(1, skyBottom);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = '#0c3a2f';
+  const duskStrength = 1 - Math.abs(0.5 - state.skyBlend) * 1.8;
+  if (duskStrength > 0) {
+    const dusk = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    dusk.addColorStop(0, `rgba(252, 211, 77, ${0.18 * duskStrength})`);
+    dusk.addColorStop(1, `rgba(79, 70, 229, ${0.25 * duskStrength})`);
+    ctx.fillStyle = dusk;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  drawCelestials();
+
+  ctx.fillStyle = lerpColor('#115e38', '#0b3323', state.skyBlend);
   ctx.fillRect(0, WORLD.ground, canvas.width, canvas.height - WORLD.ground);
-  ctx.fillStyle = '#164e3b';
+  ctx.fillStyle = lerpColor('#1d7048', '#124030', state.skyBlend);
   ctx.fillRect(0, WORLD.ground + 26, canvas.width, 16);
 
   drawShrine();
@@ -436,6 +479,49 @@ function draw() {
   drawPlayer();
   drawEnemies();
   drawHUD();
+}
+
+function drawCelestials() {
+  const phase = clamp(state.dayTimer / WORLD.dayLength, 0, 1);
+  const arcHeight = 120;
+  const minX = 60;
+  const maxX = canvas.width - 60;
+
+  if (!state.isNight) {
+    const sunX = lerp(minX, maxX, phase);
+    const sunY = 120 - Math.sin(phase * Math.PI) * arcHeight;
+    const glow = ctx.createRadialGradient(sunX, sunY, 8, sunX, sunY, 70);
+    glow.addColorStop(0, 'rgba(251, 191, 36, 0.9)');
+    glow.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 70, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fcd34d';
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 18, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const moonX = lerp(maxX, minX, phase);
+    const moonY = 130 - Math.sin(phase * Math.PI) * arcHeight;
+    const glow = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, 80);
+    glow.addColorStop(0, 'rgba(96, 165, 250, 0.8)');
+    glow.addColorStop(1, 'rgba(96, 165, 250, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, 80, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#e5e7eb';
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0c1324';
+    ctx.beginPath();
+    ctx.arc(moonX + 6, moonY - 2, 14, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawPlayer() {
@@ -500,6 +586,9 @@ function drawHUD() {
   const cycleFill = document.createElement('div');
   cycleFill.className = 'progress-fill';
   cycleFill.style.width = `${dayRatio * 100}%`;
+  const cycleDayColor = lerpColor('#fbbf24', '#22d3ee', state.skyBlend);
+  const cycleNightColor = lerpColor('#0ea5e9', '#6366f1', state.skyBlend);
+  cycleFill.style.background = `linear-gradient(90deg, ${cycleDayColor}, ${cycleNightColor})`;
   cycleBar.appendChild(cycleFill);
   const cycleNote = document.createElement('div');
   cycleNote.className = 'progress-label';
@@ -596,6 +685,7 @@ function resetGame() {
   state.waveInterval = 0;
   state.enemies = [];
   state.projectiles = [];
+  state.skyBlend = 0;
   resetEffects();
   Object.keys(input).forEach((key) => {
     input[key] = false;
