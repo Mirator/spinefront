@@ -178,7 +178,7 @@ export function createRenderer({ canvas, fxLayer, canvasWrap, hud, colors = COLO
   }
 
   function drawHUD(snapshot) {
-    const { state, world, player, shrine, walls, towers } = snapshot;
+    const { state, world, player, shrine } = snapshot;
     hud.innerHTML = '';
     const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
     const dayRatio = clamp(state.dayTimer / world.dayLength, 0, 1);
@@ -220,9 +220,6 @@ export function createRenderer({ canvas, fxLayer, canvasWrap, hud, colors = COLO
     const tags = [
       { label: 'Nights', value: `${state.nightsSurvived}/${world.nightsToWin}` },
       { label: 'Gold', value: state.currency },
-      { label: 'Crown', value: player.crown ? 'Safe' : 'Lost' },
-      { label: 'Walls', value: walls.map((w) => Math.max(0, Math.floor(w.hp))).join(' / ') },
-      { label: 'Towers', value: towers.map((t) => Math.max(0, Math.floor(t.hp))).join(' / ') },
     ];
     tags.forEach((tag) => {
       const el = document.createElement('span');
