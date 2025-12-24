@@ -33,11 +33,19 @@ The project is intended to run as a front-end app with a lightweight dev server.
    ```bash
    npm run build
    ```
-5. Preview a production build locally (after running `npm run build`):
+5. Run end-to-end tests (requires a dev server to start automatically; uses Playwright):
+   ```bash
+   npm run test:e2e
+   ```
+   For a headed browser during debugging:
+   ```bash
+   npm run test:e2e:headed
+   ```
+6. Preview a production build locally (after running `npm run build`):
    ```bash
    npm run preview
    ```
-6. Alternatively, serve the static output with your preferred tool, for example:
+7. Alternatively, serve the static output with your preferred tool, for example:
    ```bash
    npx serve dist
    ```
