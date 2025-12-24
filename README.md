@@ -3,12 +3,15 @@
 ## Project purpose
 Spinefront is a fast-paced cooperative action builder where players push a contested frontline by fighting enemies, fortifying positions, and using vertical routes to outmaneuver threats. The project aims to deliver a concise multiplayer-ready slice that proves out the core movement, combat, and building loops while staying light enough for quick iteration and GitHub Pages deployment.
 
-### MVP feature list
-- Core loop: explore the map, gather resources, and hold or advance the frontline while responding to enemy waves.
-- Player movement set: smooth locomotion, sprinting, and directional climbing for navigating vertical spaces.
-- Combat interactions: light and heavy attacks, basic enemy AI, and clear hit feedback.
-- Building toolkit: quick-access build menu, placeable walls/platforms, and repair/dismantle interactions to reconfigure defenses.
-- Session flow: solo or small-group play with a match timer, win/lose resolution, and a summary screen that highlights contributions.
+### Current feature list
+- Day/night cycle that alternates every 30 seconds and drives wave pacing.
+- Wave survival: enemies spawn at night from either side and target defensive structures.
+- Defenses: two walls and two towers with individual health bars; towers auto-fire at nearby enemies.
+- Shrine tech: spend 10 gold at the central shrine to increase tower fire rate.
+- Economy: earn 10 gold each sunrise and 5 gold at the start of a night.
+- Victory: survive **3 nights**.
+- Defeat: touch an enemy while carrying the crown (player contact drops the crown and ends the run).
+- Restart: click the HUD restart button or press **R** at any time.
 
 ## Running the project locally
 The project is intended to run as a front-end app with a lightweight dev server.
@@ -49,15 +52,17 @@ The project is intended to run as a front-end app with a lightweight dev server.
 - Set the repository’s Pages base path if deploying to a project site so asset URLs resolve correctly (e.g., `vite.config` `base` option when using Vite).
 
 ## Controls reference
-- Move: WASD / arrow keys
-- Sprint: Hold Shift while moving
-- Attack: Left mouse button (tap for light, hold for charged/heavy if supported)
-- Build: Press **B** to open the build menu, choose a structure, then left-click to place
-- Climb: Jump/Space near a climbable surface to latch and move with WASD
+- Move: **A/D** or **←/→**
+- Jump: **Space**
+- Ladder climb: **W/S** or **↑/↓** when on the shrine ladder
+- Sprint: Hold **Shift** while moving
+- Attack: **F** to swing your sword
+- Interact: **E** near the shrine to unlock tower tech (costs 10 gold)
+- Reset: **R** to restart immediately; a Restart button also appears after win/lose
 
 ## Win and lose conditions
-- Win: Hold the frontline until the match timer expires, or capture all objectives and trigger the extraction phase without losing the base core.
-- Lose: Base core destroyed, squad wipe with no respawns remaining, or extraction timer expires before objectives are secured.
+- Win: Endure through **3 nights**. A victory banner appears and you can restart from the HUD.
+- Lose: Any enemy touching the player knocks off the crown and immediately ends the run.
 
 ## Contributing and testing
 - Use short-lived feature branches and open pull requests that describe the change and any player-facing impact.
