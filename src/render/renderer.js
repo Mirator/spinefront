@@ -1,38 +1,25 @@
 import { COLORS } from '../core/constants.js';
 import { clamp, lerpColor } from '../systems/math.js';
 
-export function createRenderer({ canvas, fxLayer, canvasWrap, hud, colors = COLORS, onReset }) {
+function drawRoundedRect(ctx, x, y, w, h, r = 12) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+export function createRenderer({ canvas, colors = COLORS }) {
   const ctx = canvas.getContext('2d');
 
-  function renderEffects(effects, world) {
-    if (fxLayer) {
-      fxLayer.innerHTML = '';
-      effects.hitFlashes.forEach((flash) => {
-        const flashEl = document.createElement('div');
-        flashEl.className = 'hit-flash';
-        const fade = flash.timer / flash.duration;
-        flashEl.style.left = `${flash.x * 100}%`;
-        flashEl.style.top = `${flash.y * 100}%`;
-        flashEl.style.opacity = fade;
-        flashEl.style.transform = `translate(-50%, -50%) rotate(${flash.angle}deg) scale(${1 + (1 - fade) * 0.35})`;
-        fxLayer.appendChild(flashEl);
-      });
-
-      if (effects.vignette.timer > 0) {
-        const strength = (effects.vignette.timer / effects.vignette.duration) * effects.vignette.intensity;
-        const vignetteEl = document.createElement('div');
-        vignetteEl.className = 'vignette';
-        vignetteEl.style.opacity = strength;
-        fxLayer.appendChild(vignetteEl);
-      }
-    }
-
-    if (canvasWrap) {
-      canvasWrap.style.transform = `translate(${effects.shakeOffset.x}px, ${effects.shakeOffset.y}px)`;
-    }
-  }
-
-  function drawPlayer(ctx, player) {
+  function drawPlayer(player) {
     ctx.fillStyle = colors.player;
     ctx.fillRect(player.x, player.y, player.w, player.h);
     ctx.fillStyle = colors.playerEye;
@@ -43,7 +30,7 @@ export function createRenderer({ canvas, fxLayer, canvasWrap, hud, colors = COLO
     }
   }
 
-  function drawPlayerAttack(ctx, player) {
+  function drawPlayerAttack(player) {
     if (player.swingTimer <= 0) return;
     const dir = player.swingFacing;
     const progress = 1 - player.swingTimer / player.swingDuration;
@@ -177,52 +164,165 @@ export function createRenderer({ canvas, fxLayer, canvasWrap, hud, colors = COLO
     }
   }
 
-  function drawHUD(snapshot) {
-    const { state, world, player, shrine } = snapshot;
-    hud.innerHTML = '';
-    const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
-
-    const tags = [
-      { label: 'Nights', value: `${state.nightsSurvived}/${world.nightsToWin}` },
-      { label: 'Gold', value: state.currency },
-    ];
-    tags.forEach((tag) => {
-      const el = document.createElement('span');
-      el.className = 'tag';
-      el.innerHTML = `<strong>${tag.label}:</strong> ${tag.value}`;
-      hud.appendChild(el);
+  function drawHitFlashes(effects, world) {
+    if (!effects.hitFlashes.length) return;
+    ctx.save();
+    effects.hitFlashes.forEach((flash) => {
+      const fade = clamp(flash.timer / flash.duration, 0, 1);
+      const x = flash.x * world.width;
+      const y = flash.y * world.height;
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.beginPath();
+      ctx.ellipse(x, y, 12, 4, (flash.angle * Math.PI) / 180, 0, Math.PI * 2);
+      ctx.fill();
     });
-
-    const shrineTag = document.createElement('span');
-    shrineTag.className = 'tag';
-    if (state.shrineUnlocked) {
-      shrineTag.innerHTML = '<strong>Shrine:</strong> Unlocked — towers fire faster';
-    } else if (nearShrine) {
-      const canBuy = state.currency >= 10;
-      shrineTag.innerHTML = `<strong>E:</strong> Unlock shrine (10 gold) — towers fire faster${!canBuy ? ' (need gold)' : ''}`;
-    } else {
-      shrineTag.innerHTML = '<strong>Shrine:</strong> Locked (approach to unlock)';
-    }
-    hud.appendChild(shrineTag);
-
-    if (state.hudText) {
-      const notice = document.createElement('span');
-      notice.className = 'tag';
-      notice.textContent = state.hudText;
-      hud.appendChild(notice);
-    }
-
-    if (state.ended) {
-      const button = document.createElement('button');
-      button.className = 'tag restart';
-      button.textContent = 'Restart';
-      button.onclick = onReset;
-      hud.appendChild(button);
-    }
+    ctx.restore();
   }
 
-  function draw(snapshot) {
-    const { world, state, player, shrine, walls, towers, enemies, projectiles } = snapshot;
+  function drawVignette(effects) {
+    if (effects.vignette.timer <= 0) return;
+    const strength = (effects.vignette.timer / effects.vignette.duration) * effects.vignette.intensity;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = Math.max(canvas.width, canvas.height) * 0.75;
+    const gradient = ctx.createRadialGradient(cx, cy, radius * 0.25, cx, cy, radius);
+    gradient.addColorStop(0, 'rgba(248, 113, 113, 0)');
+    gradient.addColorStop(1, 'rgba(248, 113, 113, 0.55)');
+    ctx.save();
+    ctx.globalAlpha = strength;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  function drawHUD(snapshot) {
+    const { state, world, player, shrine } = snapshot;
+    const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
+    const hudLines = [
+      `Nights: ${state.nightsSurvived}/${world.nightsToWin}`,
+      `Gold: ${state.currency}`,
+    ];
+    const shrineLine = state.shrineUnlocked
+      ? 'Shrine: Unlocked — towers fire faster'
+      : nearShrine
+        ? `E: Unlock shrine (10 gold)${state.currency < 10 ? ' — need gold' : ''}`
+        : 'Shrine: Locked (approach to unlock)';
+    hudLines.push(shrineLine);
+    if (state.hudText) {
+      hudLines.push(state.hudText);
+    }
+
+    ctx.save();
+    const padding = 12;
+    const maxWidth = 280;
+    const lineHeight = 18;
+    const blockHeight = padding * 2 + hudLines.length * lineHeight;
+    const x = canvas.width - maxWidth - 12;
+    const y = 12;
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    drawRoundedRect(ctx, x, y, maxWidth, blockHeight, 10);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#e5e7eb';
+    ctx.font = '14px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+    hudLines.forEach((line, idx) => {
+      ctx.fillText(line, x + padding, y + padding + idx * lineHeight);
+    });
+    ctx.restore();
+  }
+
+  function drawHelpBar() {
+    ctx.save();
+    ctx.font = '13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = 'rgba(229, 231, 235, 0.9)';
+    const text =
+      'Move: A/D or ←/→ | Jump: Space | Ladder: W/S or ↑/↓ | Sprint: Shift | Attack: F | Interact: E | Restart: R | Menu: Esc';
+    ctx.fillText(text, canvas.width / 2, canvas.height - 12);
+    ctx.restore();
+  }
+
+  function drawMenuOverlay(snapshot) {
+    const { state } = snapshot;
+    if (!state.menuOpen) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const panelWidth = Math.min(520, canvas.width - 40);
+    const panelHeight = 260;
+    const panelX = (canvas.width - panelWidth) / 2;
+    const panelY = (canvas.height - panelHeight) / 2;
+
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.9)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1.5;
+    drawRoundedRect(ctx, panelX, panelY, panelWidth, panelHeight, 16);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '12px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText((state.menuStatus || 'Run paused').toUpperCase(), panelX + 18, panelY + 16);
+
+    ctx.fillStyle = '#e5e7eb';
+    ctx.font = '22px Inter, system-ui, sans-serif';
+    ctx.fillText('Hold the Outpost', panelX + 18, panelY + 36);
+
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '14px Inter, system-ui, sans-serif';
+    const message = state.menuMessage || 'Survive 3 nights, defend the crown, and unlock the shrine.';
+    ctx.fillText(message, panelX + 18, panelY + 64);
+
+    ctx.font = '13px Inter, system-ui, sans-serif';
+    const items = [
+      'Win by surviving 3 nights.',
+      'Keep walls and towers standing to slow the horde.',
+      'Unlock shrine tech for 10 gold to speed up tower fire rate.',
+      'Income arrives at dawn (+10) and at the start of each night (+5).',
+    ];
+    items.forEach((line, idx) => {
+      ctx.fillText(`• ${line}`, panelX + 18, panelY + 96 + idx * 18);
+    });
+
+    ctx.fillStyle = '#e5e7eb';
+    const startLabel = state.menuStartLabel || 'Start run';
+    const actions = [
+      `${startLabel}: Enter / Space`,
+      'Open/close menu: Esc',
+      'Restart: R',
+    ];
+    actions.forEach((line, idx) => {
+      ctx.fillText(line, panelX + 18, panelY + 178 + idx * 18);
+    });
+    ctx.restore();
+  }
+
+  function drawOutcome(state, world) {
+    if (!state.ended) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = state.crownLost ? '#f87171' : '#34d399';
+    ctx.font = '28px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const message = state.crownLost ? 'Crown lost! You were overrun.' : 'Victory! Dawn rises and you endure.';
+    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+    ctx.font = '16px Inter, system-ui, sans-serif';
+    ctx.fillStyle = '#e5e7eb';
+    const sub = 'Press Enter to continue or R to restart';
+    ctx.fillText(sub, canvas.width / 2, canvas.height / 2 + 28);
+    ctx.restore();
+  }
+
+  function drawBackground(state, world) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const skyTop = lerpColor('#78bef5', '#0c1324', state.skyBlend);
     const skyBottom = lerpColor('#1e3a8a', '#0f172a', state.skyBlend);
@@ -247,25 +347,30 @@ export function createRenderer({ canvas, fxLayer, canvasWrap, hud, colors = COLO
     ctx.fillRect(0, world.ground, canvas.width, canvas.height - world.ground);
     ctx.fillStyle = lerpColor('#1d7048', '#124030', state.skyBlend);
     ctx.fillRect(0, world.ground + 26, canvas.width, 16);
+  }
 
+  function draw(snapshot) {
+    const { world, state, player, shrine, walls, towers, enemies, projectiles } = snapshot;
+
+    // World layer (shaken)
+    ctx.save();
+    ctx.translate(state.effects.shakeOffset.x, state.effects.shakeOffset.y);
+    drawBackground(state, world);
     drawShrine(shrine, state.shrineUnlocked);
     drawStructures(walls, towers);
     drawEnemies(enemies);
     drawProjectiles(projectiles);
-    drawPlayer(ctx, player);
-    drawPlayerAttack(ctx, player);
-    if (state.crownLost || state.nightsSurvived >= world.nightsToWin) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = state.crownLost ? '#f87171' : '#34d399';
-      ctx.font = '32px Inter, sans-serif';
-      const message = state.crownLost
-        ? 'Crown lost! You were overrun.'
-        : 'Victory! Dawn rises and you endure.';
-      ctx.fillText(message, canvas.width / 2 - 210, canvas.height / 2);
-    }
+    drawPlayer(player);
+    drawPlayerAttack(player);
+    drawHitFlashes(state.effects, world);
+    drawVignette(state.effects);
+    ctx.restore();
+
+    // UI layer (stable)
     drawHUD(snapshot);
-    renderEffects(state.effects, world);
+    drawHelpBar();
+    drawOutcome(state, world);
+    drawMenuOverlay(snapshot);
   }
 
   return { render: draw };
