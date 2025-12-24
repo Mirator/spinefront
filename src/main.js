@@ -18,7 +18,6 @@ import { updateDayNight, checkEndConditions } from './systems/cycle.js';
 import { updateEnemySpawns } from './systems/spawning.js';
 
 const canvas = document.getElementById('game');
-const menuToggleButton = document.getElementById('menu-toggle');
 const menuStartButton = document.getElementById('menu-start');
 
 const store = createGameStore({ width: canvas.width, height: canvas.height });
@@ -89,11 +88,6 @@ const controlsCleanup = bindDomControls({
 });
 
 function syncMenuButtons() {
-  if (menuToggleButton) {
-    menuToggleButton.setAttribute('aria-pressed', store.state.menuOpen ? 'true' : 'false');
-    menuToggleButton.textContent = store.state.menuOpen ? 'Close menu' : 'Menu';
-  }
-
   if (menuStartButton) {
     if (store.state.menuOpen) {
       menuStartButton.hidden = false;
@@ -200,7 +194,6 @@ openMenu('intro');
 updateMenu('intro');
 syncMenuButtons();
 
-menuToggleButton?.addEventListener('click', () => toggleMenu('paused'));
 menuStartButton?.addEventListener('click', () => startFromMenu());
 
 requestAnimationFrame(loop);
