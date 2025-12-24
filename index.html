@@ -13,6 +13,28 @@
     </div>
     <div class="canvas-frame">
       <canvas id="game" width="960" height="540" aria-label="Spinefront Outpost"></canvas>
+      <div class="mobile-controls" aria-hidden="true">
+        <div class="mobile-cluster dpad" role="presentation">
+          <div class="dpad-row">
+            <button id="control-up" class="mobile-control" type="button" aria-label="Move up">▲</button>
+          </div>
+          <div class="dpad-row">
+            <button id="control-left" class="mobile-control" type="button" aria-label="Move left">◀</button>
+            <button id="control-down" class="mobile-control" type="button" aria-label="Move down">▼</button>
+            <button id="control-right" class="mobile-control" type="button" aria-label="Move right">▶</button>
+          </div>
+        </div>
+        <div class="mobile-cluster actions" role="presentation">
+          <div class="action-row">
+            <button id="control-jump" class="mobile-control" type="button">Jump</button>
+            <button id="control-attack" class="mobile-control" type="button">Attack</button>
+          </div>
+          <div class="action-row">
+            <button id="control-interact" class="mobile-control" type="button">Interact</button>
+            <button id="control-restart" class="mobile-control ghost" type="button">Restart</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <script type="module" src="./src/main.js"></script>

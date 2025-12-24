@@ -99,10 +99,85 @@ canvas {
   border-color: rgba(59, 130, 246, 0.5);
 }
 
+.mobile-controls {
+  position: absolute;
+  inset: 0;
+  display: none;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 16px;
+  pointer-events: none;
+  gap: 16px;
+}
+
+.mobile-controls .mobile-cluster {
+  pointer-events: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-controls .dpad {
+  grid-template-columns: repeat(3, 54px);
+  grid-template-rows: repeat(2, 54px);
+  align-items: center;
+  justify-items: center;
+}
+
+.dpad-row {
+  display: contents;
+}
+
+.mobile-controls .actions {
+  grid-template-columns: repeat(2, minmax(84px, 1fr));
+}
+
+.action-row {
+  display: contents;
+}
+
+.mobile-control {
+  width: 100%;
+  height: 54px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e5e7eb;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.mobile-control:active,
+.mobile-control.pressed {
+  transform: translateY(1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+  background: rgba(59, 130, 246, 0.75);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.mobile-control.ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+}
+
+.mobile-control.ghost:active,
+.mobile-control.ghost.pressed {
+  background: rgba(248, 113, 113, 0.8);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
 @media (max-width: 640px) {
   canvas {
     width: 100vw;
     height: calc(100vw * (9 / 16));
     max-height: 100vh;
+  }
+
+  .mobile-controls {
+    display: flex;
   }
 }
