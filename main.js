@@ -768,5 +768,69 @@ document.addEventListener('keyup', (e) => {
   if (e.code === 'KeyE') input.interact = false;
 });
 
+function bindTouchControl(id, { onStart, onEnd, ignoreEnded = false, autoRelease = false }) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const handleStart = (e) => {
+    e.preventDefault();
+    if (ignoreEnded && state.ended) return;
+    el.classList.add('pressed');
+    if (typeof onStart === 'function') onStart();
+    if (autoRelease) {
+      setTimeout(() => el.classList.remove('pressed'), 140);
+    }
+  };
+  const handleEnd = (e) => {
+    e.preventDefault();
+    el.classList.remove('pressed');
+    if (typeof onEnd === 'function') onEnd();
+  };
+
+  el.addEventListener('touchstart', handleStart, { passive: false });
+  el.addEventListener('touchend', handleEnd, { passive: false });
+  el.addEventListener('touchcancel', handleEnd, { passive: false });
+}
+
+bindTouchControl('control-left', {
+  onStart: () => (input.left = true),
+  onEnd: () => (input.left = false),
+  ignoreEnded: true,
+});
+bindTouchControl('control-right', {
+  onStart: () => (input.right = true),
+  onEnd: () => (input.right = false),
+  ignoreEnded: true,
+});
+bindTouchControl('control-up', {
+  onStart: () => (input.up = true),
+  onEnd: () => (input.up = false),
+  ignoreEnded: true,
+});
+bindTouchControl('control-down', {
+  onStart: () => (input.down = true),
+  onEnd: () => (input.down = false),
+  ignoreEnded: true,
+});
+bindTouchControl('control-jump', {
+  onStart: () => (input.jump = true),
+  onEnd: () => (input.jump = false),
+  ignoreEnded: true,
+});
+bindTouchControl('control-attack', {
+  onStart: () => (input.attack = true),
+  onEnd: () => (input.attack = false),
+  ignoreEnded: true,
+});
+bindTouchControl('control-interact', {
+  onStart: () => (input.interact = true),
+  onEnd: () => (input.interact = false),
+  ignoreEnded: true,
+});
+bindTouchControl('control-restart', {
+  onStart: () => resetGame(),
+  onEnd: () => {},
+  autoRelease: true,
+});
+
 draw();
 requestAnimationFrame(loop);
