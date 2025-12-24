@@ -277,6 +277,28 @@ canvas {
   }
 }
 
+@media (max-height: 520px) and (orientation: landscape) {
+  .layout {
+    padding: 14px 14px 22px;
+  }
+  .stage {
+    padding: 12px;
+  }
+  .mobile-controls {
+    display: flex;
+    padding: 10px 10px 14px;
+    gap: 8px;
+  }
+  .mobile-controls .control-group.vertical {
+    right: 10px;
+    bottom: 16px;
+  }
+  .control-btn {
+    padding: 10px 12px;
+    min-width: 56px;
+  }
+}
+
 @media (max-width: 540px) {
   h1 {
     font-size: 20px;
