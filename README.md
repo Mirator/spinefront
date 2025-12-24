@@ -13,6 +13,9 @@ Spinefront is a fast-paced cooperative action builder where players push a conte
 ## Running the project locally
 The project is intended to run as a front-end app with a lightweight dev server.
 
+- Quick play: open `index.html` in your browser (no build step required).
+- Local static serve: `npx serve .` (or any static server that points at the repo root).
+
 1. Install Node.js 18+.
 2. Install dependencies:
    ```bash
