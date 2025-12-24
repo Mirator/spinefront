@@ -1,5 +1,15 @@
-export function bindDomControls({ input, isEnded, onReset }) {
+export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => false, onStart, onToggleMenu }) {
   const keydown = (e) => {
+    if (e.code === 'Escape' && typeof onToggleMenu === 'function') {
+      onToggleMenu();
+      return;
+    }
+    if (isMenuOpen()) {
+      if ((e.code === 'Enter' || e.code === 'Space') && typeof onStart === 'function') {
+        onStart();
+      }
+      return;
+    }
     if (e.code === 'KeyR') {
       onReset();
       return;
