@@ -16,8 +16,8 @@ Spinefront is a fast-paced cooperative action builder where players push a conte
 ## Running the project locally
 The project is intended to run as a front-end app with a lightweight dev server.
 
-- Quick play: open `index.html` in your browser (no build step required).
-- Local static serve: `npx serve .` (or any static server that points at the repo root).
+- Quick play: run `npm run dev` to start the Vite dev server and open the local URL.
+- Local static serve: build with `npm run build` and serve the `dist/` output (or use `npm run preview`).
 
 1. Install Node.js 18+.
 2. Install dependencies:
@@ -60,6 +60,14 @@ The project is intended to run as a front-end app with a lightweight dev server.
 - Interact: **E** near the shrine to unlock tower tech (costs 10 gold)
 - Reset: **R** to restart immediately; a Restart button also appears after win/lose
 
+## Project structure
+- `src/core`: shared constants and input helpers.
+- `src/state`: entity factories and the central game store/reset helpers.
+- `src/systems`: simulation systems (cycle handling, combat, spawning, effects, movement).
+- `src/render`: canvas and HUD renderer that consume immutable snapshots.
+- `src/input/domControls.js`: DOM bindings for keyboard and touch input.
+- `src/main.js`: game loop orchestrator used by the Vite bundle entry.
+
 ## Win and lose conditions
 - Win: Endure through **3 nights**. A victory banner appears and you can restart from the HUD.
 - Lose: Any enemy touching the player knocks off the crown and immediately ends the run.
@@ -69,5 +77,5 @@ The project is intended to run as a front-end app with a lightweight dev server.
 - Keep docs updated when you add or modify controls, objectives, or buildables.
 - Run available quality gates before opening a PR:
   - `npm run lint` (static analysis, when configured)
-  - `npm test` (unit/e2e suites, when available)
+  - `npm test` (unit tests via Vitest)
 - For UI changes, include screenshots and summarize user impact in the PR body.
