@@ -1,5 +1,7 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const fxLayer = document.getElementById('fx-layer');
+const canvasWrap = document.getElementById('canvas-wrap');
 
 const WORLD = {
   width: canvas.width,
@@ -21,6 +23,17 @@ const input = {
   interact: false,
 };
 
+function createEffectsState() {
+  return {
+    hitFlashes: [],
+    screenShake: { power: 0, duration: 0, baseDuration: 0 },
+    shakeOffset: { x: 0, y: 0 },
+    vignette: { timer: 0, duration: 0, intensity: 0 },
+    slowdown: { timer: 0, duration: 0, minScale: 1 },
+    timeScale: 1,
+  };
+}
+
 const state = {
   time: 0,
   dayTimer: 0,
@@ -36,6 +49,7 @@ const state = {
   hudText: '',
   waveTimer: 0,
   waveInterval: 0,
+  effects: createEffectsState(),
 };
 
 const colors = {
@@ -139,6 +153,111 @@ function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
 }
 
+function addHitFlash(x, y) {
+  state.effects.hitFlashes.push({
+    x: clamp(x / canvas.width, 0, 1),
+    y: clamp(y / canvas.height, 0, 1),
+    timer: 0.2,
+    duration: 0.2,
+    angle: Math.random() * 50 - 25,
+  });
+}
+
+function triggerScreenShake(power = 4, duration = 0.2) {
+  const shake = state.effects.screenShake;
+  shake.power = Math.max(power, shake.power);
+  shake.duration = Math.max(duration, shake.duration);
+  shake.baseDuration = Math.max(duration, shake.duration);
+}
+
+function triggerSlowdown(duration = 0.35, minScale = 0.6) {
+  state.effects.slowdown.timer = duration;
+  state.effects.slowdown.duration = duration;
+  state.effects.slowdown.minScale = minScale;
+  state.effects.timeScale = minScale;
+}
+
+function triggerDangerFlash() {
+  state.effects.vignette.timer = 0.55;
+  state.effects.vignette.duration = 0.55;
+  state.effects.vignette.intensity = 0.8;
+  triggerSlowdown(0.45, 0.55);
+}
+
+function updateEffects(dt) {
+  state.effects.hitFlashes = state.effects.hitFlashes
+    .map((flash) => ({ ...flash, timer: flash.timer - dt }))
+    .filter((flash) => flash.timer > 0);
+
+  const shake = state.effects.screenShake;
+  if (shake.duration > 0) {
+    const falloff = shake.baseDuration > 0 ? shake.duration / shake.baseDuration : 0;
+    const magnitude = shake.power * falloff;
+    state.effects.shakeOffset.x = (Math.random() * 2 - 1) * magnitude;
+    state.effects.shakeOffset.y = (Math.random() * 2 - 1) * magnitude;
+    shake.duration = Math.max(0, shake.duration - dt);
+    shake.power = Math.max(0, shake.power * 0.9);
+  } else {
+    state.effects.shakeOffset.x = 0;
+    state.effects.shakeOffset.y = 0;
+    shake.power = 0;
+    shake.baseDuration = 0;
+  }
+
+  const vig = state.effects.vignette;
+  if (vig.timer > 0) {
+    vig.timer = Math.max(0, vig.timer - dt);
+  }
+
+  const slow = state.effects.slowdown;
+  if (slow.timer > 0) {
+    const progress = 1 - slow.timer / slow.duration;
+    state.effects.timeScale = slow.minScale + (1 - slow.minScale) * progress;
+    slow.timer = Math.max(0, slow.timer - dt);
+  } else {
+    state.effects.timeScale = 1;
+  }
+}
+
+function renderEffects() {
+  if (fxLayer) {
+    fxLayer.innerHTML = '';
+    state.effects.hitFlashes.forEach((flash) => {
+      const flashEl = document.createElement('div');
+      flashEl.className = 'hit-flash';
+      const fade = flash.timer / flash.duration;
+      flashEl.style.left = `${flash.x * 100}%`;
+      flashEl.style.top = `${flash.y * 100}%`;
+      flashEl.style.opacity = fade;
+      flashEl.style.transform = `translate(-50%, -50%) rotate(${flash.angle}deg) scale(${1 + (1 - fade) * 0.35})`;
+      fxLayer.appendChild(flashEl);
+    });
+
+    if (state.effects.vignette.timer > 0) {
+      const strength =
+        (state.effects.vignette.timer / state.effects.vignette.duration) * state.effects.vignette.intensity;
+      const vignetteEl = document.createElement('div');
+      vignetteEl.className = 'vignette';
+      vignetteEl.style.opacity = strength;
+      fxLayer.appendChild(vignetteEl);
+    }
+  }
+
+  if (canvasWrap) {
+    canvasWrap.style.transform = `translate(${state.effects.shakeOffset.x}px, ${state.effects.shakeOffset.y}px)`;
+  }
+}
+
+function resetEffects() {
+  state.effects = createEffectsState();
+  if (fxLayer) {
+    fxLayer.innerHTML = '';
+  }
+  if (canvasWrap) {
+    canvasWrap.style.transform = 'translate(0px, 0px)';
+  }
+}
+
 function handleInput(dt) {
   if (state.ended) return;
   player.onLadder = player.x + player.w / 2 > shrine.x - 8 && player.x + player.w / 2 < shrine.x + shrine.w + 8;
@@ -177,8 +296,10 @@ function handleInput(dt) {
 function swingSword() {
   const arc = { x: player.x + (player.facing > 0 ? player.w : -24), y: player.y, w: 32, h: player.h };
   state.enemies.forEach((enemy) => {
-    if (overlaps(arc, enemy)) {
+    if (enemy.hp > 0 && overlaps(arc, enemy)) {
       enemy.hp -= 25;
+      addHitFlash(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2);
+      triggerScreenShake(4, 0.18);
     }
   });
 }
@@ -235,6 +356,8 @@ function updateTowers(dt) {
       if (target) {
         target.hp -= 18;
         tower.fireTimer = tower.fireRate;
+        addHitFlash(target.x + target.w / 2, target.y + target.h / 2);
+        triggerScreenShake(2.6, 0.14);
       }
     }
   });
@@ -252,13 +375,21 @@ function spawnEnemies(dt) {
 }
 
 function handleCollisions() {
+  let playerHit = false;
   state.enemies.forEach((e) => {
     if (e.hp <= 0) return;
     if (overlaps(e, player)) {
-      player.crown = false;
-      state.crownLost = true;
+      playerHit = true;
+      if (player.crown) {
+        player.crown = false;
+        state.crownLost = true;
+      }
     }
   });
+
+  if (playerHit) {
+    triggerDangerFlash();
+  }
 }
 
 function cleanup() {
@@ -447,6 +578,8 @@ function drawHUD() {
     button.addEventListener('click', resetGame);
     hud.appendChild(button);
   }
+
+  renderEffects();
 }
 
 function resetGame() {
@@ -463,6 +596,7 @@ function resetGame() {
   state.waveInterval = 0;
   state.enemies = [];
   state.projectiles = [];
+  resetEffects();
   Object.keys(input).forEach((key) => {
     input[key] = false;
   });
@@ -507,9 +641,11 @@ function loop(now) {
   last = now;
   accumulator += frame;
   while (accumulator >= fixedDelta) {
-    gameStep(fixedDelta);
+    updateEffects(fixedDelta);
+    const scaledDt = fixedDelta * state.effects.timeScale;
+    gameStep(scaledDt);
     accumulator -= fixedDelta;
-    state.time += fixedDelta;
+    state.time += scaledDt;
   }
   requestAnimationFrame(loop);
 }
