@@ -4,6 +4,7 @@ import { createGameStore, resetGameStore } from '../state/store.js';
 import { createEnemy } from '../state/entities.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { resolveEnemyAttacks, swingSword, updateProjectiles, updateTowers } from '../systems/combat.js';
+import { applyInputToPlayer } from '../systems/movement.js';
 import { updateEnemySpawns } from '../systems/spawning.js';
 
 describe('game logic systems', () => {
@@ -60,18 +61,44 @@ describe('game logic systems', () => {
     enemy.hp = 10;
     store.state.enemies.push(enemy);
 
+    const baseFireRate = store.towers[0].fireRate;
     store.towers[0].fireTimer = 0;
     const projectiles = [];
     updateTowers([store.towers[0]], store.state.enemies, projectiles, false, 0.05);
     expect(projectiles.length).toBe(1);
     const cadence = store.towers[0].fireTimer;
-    expect(cadence).toBeGreaterThan(1);
+    expect(cadence).toBeCloseTo(baseFireRate, 5);
 
-    const fasterTower = { ...store.towers[0], fireTimer: 0, fireRate: 1.4 };
+    const fasterTower = { ...store.towers[0], fireTimer: 0 };
     projectiles.length = 0;
     updateTowers([fasterTower], store.state.enemies, projectiles, true, 0.05);
     expect(projectiles.length).toBe(1);
-    expect(fasterTower.fireTimer).toBeLessThan(cadence);
+    const expectedCadence = Math.max(0.7, baseFireRate * 0.75);
+    expect(fasterTower.fireTimer).toBeCloseTo(expectedCadence, 5);
+    expect(fasterTower.fireRate).toBe(baseFireRate);
+  });
+
+  it('unlocks shrine without mutating tower cadence inputs', () => {
+    const store = createGameStore();
+    const [tower] = store.towers;
+    const baseFireRate = tower.fireRate;
+
+    store.player.x = store.shrine.x;
+    const input = {
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      sprint: false,
+      jump: false,
+      attack: false,
+      interact: true,
+    };
+
+    applyInputToPlayer(store.player, input, store.state, store.shrine, store.towers);
+
+    expect(store.state.shrineUnlocked).toBe(true);
+    expect(tower.fireRate).toBe(baseFireRate);
   });
 
   it('detects sword hits on enemies', () => {

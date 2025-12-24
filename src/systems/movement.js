@@ -31,7 +31,6 @@ export function applyInputToPlayer(player, input, state, shrine, towers) {
     state.currency -= ECONOMY.shrineCost;
     state.shrineUnlocked = true;
     state.hudText = 'Shrine tech unlocked! Towers shoot faster.';
-    towers.forEach((t) => (t.fireRate = Math.max(0.7, t.fireRate * 0.75)));
   }
 
   return swung;
