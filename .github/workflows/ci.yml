@@ -20,5 +20,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run unit tests
         run: npm test
+
+      - name: Run Playwright tests
+        run: npm run test:e2e
