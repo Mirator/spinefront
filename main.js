@@ -3,10 +3,16 @@ const ctx = canvas.getContext('2d');
 const fxLayer = document.getElementById('fx-layer');
 const canvasWrap = document.getElementById('canvas-wrap');
 
-const WORLD = {
+const BASE_WORLD = {
   width: canvas.width,
   height: canvas.height,
-  ground: canvas.height - 80,
+  groundMargin: 80,
+};
+
+const WORLD = {
+  width: BASE_WORLD.width,
+  height: BASE_WORLD.height,
+  ground: BASE_WORLD.height - BASE_WORLD.groundMargin,
   gravity: 1800,
   dayLength: 30, // seconds per day cycle
   nightsToWin: 3,
@@ -63,10 +69,15 @@ const colors = {
   crown: '#fcd34d',
 };
 
+const BASE_POSITIONS = {
+  walls: [260, 640],
+  towers: [280, 620],
+};
+
 function createPlayer() {
   return {
     type: 'player',
-    x: 120,
+    x: WORLD.width * 0.125,
     y: WORLD.ground - 40,
     w: 28,
     h: 40,
@@ -141,8 +152,8 @@ function createEnemy(side) {
 
 const player = createPlayer();
 const shrine = createShrine();
-const walls = [createWall(260), createWall(640)];
-const towers = [createTower(280), createTower(620)];
+const walls = BASE_POSITIONS.walls.map((pos) => createWall(pos));
+const towers = BASE_POSITIONS.towers.map((pos) => createTower(pos));
 
 state.entities.push(player, shrine, ...walls, ...towers);
 
@@ -205,6 +216,62 @@ function triggerDangerFlash() {
   state.effects.vignette.duration = 0.55;
   state.effects.vignette.intensity = 0.8;
   triggerSlowdown(0.45, 0.55);
+}
+
+function updateWorldDimensions(width, height) {
+  const widthRatio = width / BASE_WORLD.width;
+  const heightRatio = height / BASE_WORLD.height;
+
+  WORLD.width = width;
+  WORLD.height = height;
+  const groundMargin = BASE_WORLD.groundMargin * heightRatio;
+  WORLD.ground = Math.max(height - groundMargin, height * 0.6);
+  repositionStructures(widthRatio);
+  alignEntitiesToGround();
+}
+
+function repositionStructures(widthRatio) {
+  BASE_POSITIONS.walls.forEach((baseX, idx) => {
+    if (walls[idx]) {
+      walls[idx].x = baseX * widthRatio;
+      walls[idx].y = WORLD.ground - walls[idx].h;
+    }
+  });
+  BASE_POSITIONS.towers.forEach((baseX, idx) => {
+    if (towers[idx]) {
+      towers[idx].x = baseX * widthRatio;
+      towers[idx].y = WORLD.ground - towers[idx].h;
+    }
+  });
+  shrine.x = WORLD.width / 2 - shrine.w / 2;
+  shrine.y = WORLD.ground - shrine.h;
+}
+
+function alignEntitiesToGround() {
+  player.x = clamp(player.x, 20, WORLD.width - player.w - 20);
+  player.y = Math.min(player.y, WORLD.ground - player.h);
+  state.enemies.forEach((e) => {
+    e.x = clamp(e.x, -140, WORLD.width + 140);
+    e.y = Math.min(e.y, WORLD.ground - e.h);
+  });
+}
+
+function resizeCanvas() {
+  const wrapWidth = canvasWrap ? canvasWrap.clientWidth : canvas.parentElement?.clientWidth || canvas.width;
+  const targetWidth = Math.max(320, Math.round(wrapWidth || BASE_WORLD.width));
+  const targetHeight = Math.round(targetWidth * (9 / 16));
+
+  if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+  }
+
+  if (fxLayer) {
+    fxLayer.style.width = `${canvas.width}px`;
+    fxLayer.style.height = `${canvas.height}px`;
+  }
+
+  updateWorldDimensions(canvas.width, canvas.height);
 }
 
 function updateEffects(dt) {
@@ -693,15 +760,16 @@ function resetGame() {
 
   const freshPlayer = createPlayer();
   Object.assign(player, freshPlayer);
-  player.x = freshPlayer.x;
+  player.x = Math.min(freshPlayer.x, WORLD.width - player.w - 40);
   player.y = freshPlayer.y;
 
+  const widthRatio = WORLD.width / BASE_WORLD.width;
   [walls[0], walls[1]].forEach((wall, idx) => {
-    const resetWall = createWall(idx === 0 ? 260 : 640);
+    const resetWall = createWall(BASE_POSITIONS.walls[idx] * widthRatio);
     Object.assign(wall, resetWall);
   });
   [towers[0], towers[1]].forEach((tower, idx) => {
-    const resetTower = createTower(idx === 0 ? 280 : 620);
+    const resetTower = createTower(BASE_POSITIONS.towers[idx] * widthRatio);
     Object.assign(tower, resetTower);
   });
 }
@@ -831,6 +899,9 @@ bindTouchControl('control-restart', {
   onEnd: () => {},
   autoRelease: true,
 });
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
 draw();
 requestAnimationFrame(loop);
