@@ -28,6 +28,7 @@ const state = {
   nightsSurvived: 0,
   currency: 10,
   crownLost: false,
+  ended: false,
   shrineUnlocked: false,
   entities: [],
   enemies: [],
@@ -138,6 +139,7 @@ function clamp(val, min, max) {
 }
 
 function handleInput(dt) {
+  if (state.ended) return;
   player.onLadder = player.x + player.w / 2 > shrine.x - 8 && player.x + player.w / 2 < shrine.x + shrine.w + 8;
   const accel = input.sprint ? player.sprintSpeed : player.speed;
   player.vx = 0;
@@ -372,22 +374,67 @@ function drawHUD() {
   }
 
   if (state.crownLost) {
+    state.ended = true;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#f87171';
     ctx.font = '32px Inter, sans-serif';
     ctx.fillText('Crown lost! You were overrun.', canvas.width / 2 - 180, canvas.height / 2);
   } else if (state.nightsSurvived >= WORLD.nightsToWin) {
+    state.ended = true;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#34d399';
     ctx.font = '32px Inter, sans-serif';
     ctx.fillText('Victory! Dawn rises and you endure.', canvas.width / 2 - 210, canvas.height / 2);
   }
+
+  if (state.ended) {
+    const button = document.createElement('button');
+    button.className = 'tag restart';
+    button.textContent = 'Restart';
+    button.addEventListener('click', resetGame);
+    hud.appendChild(button);
+  }
+}
+
+function resetGame() {
+  state.time = 0;
+  state.dayTimer = 0;
+  state.isNight = false;
+  state.nightsSurvived = 0;
+  state.currency = 10;
+  state.crownLost = false;
+  state.ended = false;
+  state.shrineUnlocked = false;
+  state.hudText = '';
+  state.waveTimer = 0;
+  state.enemies = [];
+  state.projectiles = [];
+  Object.keys(input).forEach((key) => {
+    input[key] = false;
+  });
+
+  const freshPlayer = createPlayer();
+  Object.assign(player, freshPlayer);
+  player.x = freshPlayer.x;
+  player.y = freshPlayer.y;
+
+  [walls[0], walls[1]].forEach((wall, idx) => {
+    const resetWall = createWall(idx === 0 ? 260 : 640);
+    Object.assign(wall, resetWall);
+  });
+  [towers[0], towers[1]].forEach((tower, idx) => {
+    const resetTower = createTower(idx === 0 ? 280 : 620);
+    Object.assign(tower, resetTower);
+  });
 }
 
 function gameStep(dt) {
-  if (state.crownLost || state.nightsSurvived >= WORLD.nightsToWin) return draw();
+  if (state.crownLost || state.nightsSurvived >= WORLD.nightsToWin) {
+    state.ended = true;
+    return draw();
+  }
   handleInput(dt);
   updatePlayer(dt);
   updateEnemies(dt);
@@ -416,6 +463,11 @@ function loop(now) {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyR') {
+    resetGame();
+    return;
+  }
+  if (state.ended) return;
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
   if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
   if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = true;
@@ -427,6 +479,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keyup', (e) => {
+  if (state.ended) return;
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
   if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
   if (e.code === 'ArrowUp' || e.code === 'KeyW') input.up = false;
