@@ -18,6 +18,7 @@ import { updateDayNight, checkEndConditions } from './systems/cycle.js';
 import { updateEnemySpawns } from './systems/spawning.js';
 
 const canvas = document.getElementById('game');
+const fullscreenButton = document.getElementById('fullscreen-toggle');
 
 const store = createGameStore({ width: canvas.width, height: canvas.height });
 
@@ -82,12 +83,65 @@ const controlsCleanup = bindDomControls({
   onToggleMenu: () => toggleMenu('paused'),
 });
 
+function isFullscreenActive() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function refreshFullscreenButton() {
+  if (!fullscreenButton) return;
+  const active = isFullscreenActive();
+  fullscreenButton.textContent = active ? 'Exit fullscreen' : 'Go fullscreen';
+  fullscreenButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+  fullscreenButton.classList.toggle('active', active);
+}
+
+async function toggleFullscreen() {
+  try {
+    if (isFullscreenActive()) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        await document.webkitExitFullscreen();
+      }
+    } else {
+      const target = document.documentElement;
+      if (target.requestFullscreen) {
+        await target.requestFullscreen({ navigationUI: 'hide' });
+      } else if (target.webkitRequestFullscreen) {
+        await target.webkitRequestFullscreen();
+      }
+    }
+  } catch (err) {
+    console.error('Unable to toggle fullscreen', err);
+  } finally {
+    refreshFullscreenButton();
+    resizeCanvas();
+  }
+}
+
+fullscreenButton?.addEventListener('click', (event) => {
+  event.preventDefault();
+  toggleFullscreen();
+});
+
 function resizeCanvas() {
-  const maxWidth = window.innerWidth - 20;
-  const maxHeight = window.innerHeight - 20;
-  const basedOnHeight = Math.round(maxHeight * (16 / 9));
-  const targetWidth = Math.max(320, Math.min(Math.round(maxWidth), basedOnHeight));
-  const targetHeight = Math.round(targetWidth * (9 / 16));
+  const aspect = 16 / 9;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  let targetWidth = Math.round(viewportWidth);
+  let targetHeight = Math.round(targetWidth / aspect);
+
+  if (targetHeight > viewportHeight) {
+    targetHeight = Math.round(viewportHeight);
+    targetWidth = Math.round(targetHeight * aspect);
+  }
+
+  const minWidth = 320;
+  if (targetWidth < minWidth) {
+    targetWidth = minWidth;
+    targetHeight = Math.round(targetWidth / aspect);
+  }
 
   if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
     canvas.width = targetWidth;
@@ -171,7 +225,16 @@ function loop(now) {
 }
 
 window.addEventListener('resize', resizeCanvas);
+document.addEventListener('fullscreenchange', () => {
+  refreshFullscreenButton();
+  resizeCanvas();
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  refreshFullscreenButton();
+  resizeCanvas();
+});
 resizeCanvas();
+refreshFullscreenButton();
 
 renderer.render(snapshot());
 openMenu('intro');
