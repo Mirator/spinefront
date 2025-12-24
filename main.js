@@ -91,6 +91,9 @@ function createPlayer() {
     facing: 1,
     attackCooldown: 0.4,
     attackTimer: 0,
+    swingTimer: 0,
+    swingDuration: 0.22,
+    swingFacing: 1,
     crown: true,
   };
 }
@@ -384,7 +387,15 @@ function handleInput(dt) {
 }
 
 function swingSword() {
-  const arc = { x: player.x + (player.facing > 0 ? player.w : -24), y: player.y, w: 32, h: player.h };
+  player.swingTimer = player.swingDuration;
+  player.swingFacing = player.facing;
+
+  const arc = {
+    x: player.x + (player.swingFacing > 0 ? player.w : -24),
+    y: player.y,
+    w: 32,
+    h: player.h,
+  };
   state.enemies.forEach((enemy) => {
     if (enemy.hp > 0 && overlaps(arc, enemy)) {
       enemy.hp -= 25;
@@ -411,6 +422,8 @@ function updatePlayer(dt) {
   } else {
     player.onGround = false;
   }
+
+  player.swingTimer = Math.max(0, player.swingTimer - dt);
 }
 
 function updateEnemies(dt) {
@@ -437,20 +450,85 @@ function updateEnemies(dt) {
   });
 }
 
+function spawnTowerProjectile(tower, target) {
+  const muzzleX = tower.x + tower.w / 2;
+  const muzzleY = tower.y + 16;
+  const targetX = target.x + target.w / 2;
+  const targetY = target.y + target.h / 2;
+  const dx = targetX - muzzleX;
+  const dy = targetY - muzzleY;
+  const distance = Math.hypot(dx, dy);
+  if (distance === 0) return;
+  const speed = 520;
+  const vx = (dx / distance) * speed;
+  const vy = (dy / distance) * speed;
+  state.projectiles.push({
+    x: muzzleX,
+    y: muzzleY,
+    vx,
+    vy,
+    radius: 4,
+    damage: 18,
+    life: Math.min(1.2, distance / speed + 0.35),
+    color: colors.tower,
+  });
+}
+
 function updateTowers(dt) {
   towers.forEach((tower) => {
     if (tower.hp <= 0) return;
     tower.fireTimer -= dt;
     if (tower.fireTimer <= 0) {
-      const target = state.enemies.find((e) => e.hp > 0 && Math.abs(e.x - tower.x) < 320);
+      const range = 360;
+      const target = state.enemies.find((e) => e.hp > 0 && Math.abs(e.x - tower.x) < range);
       if (target) {
-        target.hp -= 18;
-        tower.fireTimer = tower.fireRate;
-        addHitFlash(target.x + target.w / 2, target.y + target.h / 2);
-        triggerScreenShake(2.6, 0.14);
+        const dx = target.x + target.w / 2 - (tower.x + tower.w / 2);
+        const dy = target.y + target.h / 2 - (tower.y + 16);
+        const distance = Math.hypot(dx, dy);
+        if (distance <= range) {
+          spawnTowerProjectile(tower, target);
+          tower.fireTimer = tower.fireRate;
+        }
       }
     }
   });
+}
+
+function updateProjectiles(dt) {
+  const remaining = [];
+  state.projectiles.forEach((p) => {
+    const next = { ...p };
+    next.x += next.vx * dt;
+    next.y += next.vy * dt;
+    next.life -= dt;
+
+    let hitEnemy = null;
+    for (const enemy of state.enemies) {
+      if (enemy.hp <= 0) continue;
+      const withinX = next.x > enemy.x - next.radius && next.x < enemy.x + enemy.w + next.radius;
+      const withinY = next.y > enemy.y - next.radius && next.y < enemy.y + enemy.h + next.radius;
+      if (withinX && withinY) {
+        hitEnemy = enemy;
+        break;
+      }
+    }
+
+    if (hitEnemy) {
+      hitEnemy.hp -= next.damage;
+      addHitFlash(hitEnemy.x + hitEnemy.w / 2, hitEnemy.y + hitEnemy.h / 2);
+      triggerScreenShake(2.6, 0.14);
+    } else if (
+      next.life > 0 &&
+      next.x > -80 &&
+      next.x < WORLD.width + 80 &&
+      next.y > -80 &&
+      next.y < WORLD.height + 80
+    ) {
+      remaining.push(next);
+    }
+  });
+
+  state.projectiles = remaining;
 }
 
 function spawnEnemies(dt) {
@@ -543,8 +621,10 @@ function draw() {
 
   drawShrine();
   drawStructures();
-  drawPlayer();
   drawEnemies();
+  drawProjectiles();
+  drawPlayer();
+  drawPlayerAttack();
   drawHUD();
 }
 
@@ -602,6 +682,37 @@ function drawPlayer() {
   }
 }
 
+function drawPlayerAttack() {
+  if (player.swingTimer <= 0) return;
+  const dir = player.swingFacing;
+  const progress = 1 - player.swingTimer / player.swingDuration;
+  const swingSweep = Math.PI * (0.45 + progress * 0.55);
+  const startAngle = dir > 0 ? -Math.PI * 0.65 : Math.PI * 1.65;
+  const endAngle = startAngle + swingSweep * dir;
+  const cx = player.x + player.w / 2 + dir * (player.w * 0.35);
+  const cy = player.y + player.h * 0.55;
+  const radius = player.h * 0.95;
+  const alpha = 0.2 + 0.6 * progress;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.shadowBlur = 14;
+  ctx.shadowColor = `rgba(255, 255, 255, ${alpha})`;
+  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, startAngle, endAngle, dir < 0);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius - 8, startAngle, endAngle, dir < 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawStructures() {
   walls.forEach((wall) => {
     ctx.fillStyle = wall.hp > 0 ? colors.wall : '#374151';
@@ -628,6 +739,30 @@ function drawEnemies() {
     ctx.fillStyle = colors.enemy;
     ctx.fillRect(e.x, e.y, e.w, e.h);
   });
+}
+
+function drawProjectiles() {
+  ctx.save();
+  ctx.lineCap = 'round';
+  state.projectiles.forEach((p) => {
+    const tailX = p.x - p.vx * 0.05;
+    const tailY = p.y - p.vy * 0.05;
+    const gradient = ctx.createLinearGradient(tailX, tailY, p.x, p.y);
+    gradient.addColorStop(0, `${p.color}40`);
+    gradient.addColorStop(1, p.color);
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = p.radius * 2;
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
 }
 
 function drawHpBar(entity) {
@@ -783,6 +918,7 @@ function gameStep(dt) {
   updatePlayer(dt);
   updateEnemies(dt);
   updateTowers(dt);
+  updateProjectiles(dt);
   spawnEnemies(dt);
   handleCollisions();
   cleanup();
