@@ -35,6 +35,7 @@ const state = {
   projectiles: [],
   hudText: '',
   waveTimer: 0,
+  waveInterval: 0,
 };
 
 const colors = {
@@ -240,11 +241,13 @@ function updateTowers(dt) {
 }
 
 function spawnEnemies(dt) {
+  if (!state.isNight) return;
   state.waveTimer -= dt;
-  if (state.waveTimer <= 0 && state.isNight) {
+  if (state.waveTimer <= 0) {
     const side = Math.random() > 0.5 ? 'left' : 'right';
     state.enemies.push(createEnemy(side));
-    state.waveTimer = Math.max(1.5, 3.5 - state.nightsSurvived);
+    state.waveInterval = Math.max(1.5, 3.5 - state.nightsSurvived);
+    state.waveTimer = state.waveInterval;
   }
 }
 
@@ -270,9 +273,13 @@ function updateDayNight(dt) {
     if (state.isNight) {
       state.nightsSurvived += 1;
       state.currency += 5;
+      state.waveInterval = Math.max(1.5, 3.5 - state.nightsSurvived);
+      state.waveTimer = state.waveInterval;
       state.hudText = `Night ${state.nightsSurvived} begins.`;
     } else {
       state.currency += 10;
+      state.waveTimer = 0;
+      state.waveInterval = 0;
       state.hudText = `Sunrise! You earned income.`;
     }
   }
@@ -350,13 +357,44 @@ function drawHpBar(entity) {
 function drawHUD() {
   const hud = document.getElementById('hud');
   hud.innerHTML = '';
+  const nearShrine = overlaps(player, { x: shrine.x - 18, y: shrine.y - 18, w: shrine.w + 36, h: shrine.h + 36 });
+  const dayRatio = clamp(state.dayTimer / WORLD.dayLength, 0, 1);
+  const waveRatio = state.isNight && state.waveInterval > 0 ? clamp(state.waveTimer / state.waveInterval, 0, 1) : 0;
+
+  const cycleTag = document.createElement('span');
+  cycleTag.className = 'tag tag-bar';
+  cycleTag.innerHTML = `<strong>Cycle:</strong> ${state.isNight ? 'Night' : 'Day'}`;
+  const cycleBar = document.createElement('div');
+  cycleBar.className = 'progress';
+  const cycleFill = document.createElement('div');
+  cycleFill.className = 'progress-fill';
+  cycleFill.style.width = `${dayRatio * 100}%`;
+  cycleBar.appendChild(cycleFill);
+  const cycleNote = document.createElement('div');
+  cycleNote.className = 'progress-label';
+  cycleNote.textContent = `${Math.floor(state.dayTimer)}s / ${WORLD.dayLength}s`;
+  cycleBar.appendChild(cycleNote);
+  cycleTag.appendChild(cycleBar);
+  hud.appendChild(cycleTag);
+
+  if (state.isNight) {
+    const waveTag = document.createElement('span');
+    waveTag.className = 'tag tag-bar warn';
+    waveTag.innerHTML = `<strong>Next wave:</strong> ${Math.max(0, state.waveTimer).toFixed(1)}s`;
+    const waveBar = document.createElement('div');
+    waveBar.className = 'progress thin';
+    const waveFill = document.createElement('div');
+    waveFill.className = 'progress-fill warn';
+    waveFill.style.width = `${waveRatio * 100}%`;
+    waveBar.appendChild(waveFill);
+    waveTag.appendChild(waveBar);
+    hud.appendChild(waveTag);
+  }
+
   const tags = [
-    { label: 'Day/Night', value: state.isNight ? 'Night' : 'Day' },
-    { label: 'Cycle', value: `${Math.floor(state.dayTimer)}s / ${WORLD.dayLength}s` },
     { label: 'Nights', value: `${state.nightsSurvived}/${WORLD.nightsToWin}` },
     { label: 'Gold', value: state.currency },
     { label: 'Crown', value: player.crown ? 'Safe' : 'Lost' },
-    { label: 'Shrine', value: state.shrineUnlocked ? 'Unlocked' : 'Locked (E)' },
     { label: 'Walls', value: walls.map((w) => Math.max(0, Math.floor(w.hp))).join(' / ') },
     { label: 'Towers', value: towers.map((t) => Math.max(0, Math.floor(t.hp))).join(' / ') },
   ];
@@ -366,6 +404,19 @@ function drawHUD() {
     el.innerHTML = `<strong>${tag.label}:</strong> ${tag.value}`;
     hud.appendChild(el);
   });
+
+  const shrineTag = document.createElement('span');
+  shrineTag.className = 'tag';
+  if (state.shrineUnlocked) {
+    shrineTag.innerHTML = '<strong>Shrine:</strong> Unlocked — towers fire faster';
+  } else if (nearShrine) {
+    const canBuy = state.currency >= 10;
+    shrineTag.innerHTML = `<strong>E:</strong> Unlock shrine (10 gold) — towers fire faster${!canBuy ? ' (need gold)' : ''}`;
+  } else {
+    shrineTag.innerHTML = '<strong>Shrine:</strong> Locked (approach to unlock)';
+  }
+  hud.appendChild(shrineTag);
+
   if (state.hudText) {
     const notice = document.createElement('span');
     notice.className = 'tag';
@@ -409,6 +460,7 @@ function resetGame() {
   state.shrineUnlocked = false;
   state.hudText = '';
   state.waveTimer = 0;
+  state.waveInterval = 0;
   state.enemies = [];
   state.projectiles = [];
   Object.keys(input).forEach((key) => {
