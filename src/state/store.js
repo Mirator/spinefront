@@ -29,6 +29,9 @@ export function createGameStore(dimensions = {}) {
     currency: ECONOMY.dayIncome,
     crownLost: false,
     ended: false,
+    hasStarted: false,
+    menuOpen: true,
+    paused: true,
     shrineUnlocked: false,
     hudText: '',
     waveTimer: 0,
@@ -59,6 +62,9 @@ export function resetGameStore(store) {
   store.state.currency = ECONOMY.dayIncome;
   store.state.crownLost = false;
   store.state.ended = false;
+  store.state.hasStarted = true;
+  store.state.menuOpen = false;
+  store.state.paused = false;
   store.state.shrineUnlocked = false;
   store.state.hudText = '';
   store.state.waveTimer = 0;

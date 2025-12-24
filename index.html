@@ -9,8 +9,13 @@
 <body>
   <main class="layout">
     <section class="header">
-      <h1>Spinefront Outpost</h1>
-      <p class="subtitle">Survive the night, protect the crown.</p>
+      <div class="header-row">
+        <div>
+          <h1>Spinefront Outpost</h1>
+          <p class="subtitle">Survive the night, protect the crown.</p>
+        </div>
+        <button class="menu-button" id="open-menu" aria-label="Open game menu">Menu</button>
+      </div>
     </section>
     <section class="stage">
       <div class="canvas-wrap" id="canvas-wrap">
@@ -41,6 +46,50 @@
         <p><strong>Sprint:</strong> Shift &nbsp; <strong>Attack:</strong> F &nbsp; <strong>Unlock Shrine Tech:</strong> E near the shrine</p>
       </div>
     </section>
+    <div class="game-menu" id="game-menu" role="dialog" aria-modal="true" aria-labelledby="menu-status">
+      <div class="menu-panel">
+        <div class="menu-header">
+          <p class="eyebrow" id="menu-status">Ready to deploy</p>
+          <h2>Hold the Outpost</h2>
+          <p class="menu-lede" id="menu-message">Survive 3 nights, defend the crown, and unlock the shrine for faster towers.</p>
+        </div>
+        <div class="menu-grid">
+          <div class="menu-card">
+            <div class="menu-card-header">
+              <span class="menu-chip">Objectives</span>
+              <span class="menu-note">Win by surviving 3 nights</span>
+            </div>
+            <ul class="menu-list">
+              <li>Protect the crown—if an enemy reaches you, the run ends.</li>
+              <li>Keep walls and towers standing to slow the horde.</li>
+              <li>Unlock shrine tech for 10 gold to speed up tower fire rate.</li>
+              <li>Income arrives at dawn (+10) and at the start of each night (+5).</li>
+            </ul>
+          </div>
+          <div class="menu-card">
+            <div class="menu-card-header">
+              <span class="menu-chip">Controls</span>
+              <span class="menu-note">Keyboard & touch supported</span>
+            </div>
+            <div class="menu-controls">
+              <div class="control-row"><span class="hotkey">A / D</span><span>Move</span></div>
+              <div class="control-row"><span class="hotkey">W / S</span><span>Climb ladder</span></div>
+              <div class="control-row"><span class="hotkey">Space</span><span>Jump</span></div>
+              <div class="control-row"><span class="hotkey">Shift</span><span>Sprint</span></div>
+              <div class="control-row"><span class="hotkey">F</span><span>Attack</span></div>
+              <div class="control-row"><span class="hotkey">E</span><span>Interact at shrine</span></div>
+              <div class="control-row"><span class="hotkey">R</span><span>Restart</span></div>
+              <div class="control-row"><span class="hotkey">Esc</span><span>Open menu</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="menu-actions">
+          <button class="menu-btn primary" id="menu-start">Start run</button>
+          <button class="menu-btn ghost" id="menu-restart">Restart</button>
+          <button class="menu-btn text" id="menu-close">Close menu</button>
+        </div>
+      </div>
+    </div>
   </main>
   <script type="module" src="./src/main.js"></script>
 </body>
