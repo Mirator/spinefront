@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
 export default defineConfig({
   testDir: './tests',
   use: {
@@ -21,9 +23,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --host --port 4173',
+    command: isCI
+      ? 'npm run preview -- --host --port 4173'
+      : 'npm run dev -- --host --port 4173',
     url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !isCI,
     timeout: 120000,
   },
 });
