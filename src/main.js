@@ -18,6 +18,8 @@ import { updateDayNight, checkEndConditions } from './systems/cycle.js';
 import { updateEnemySpawns } from './systems/spawning.js';
 
 const canvas = document.getElementById('game');
+const menuToggleButton = document.getElementById('menu-toggle');
+const menuStartButton = document.getElementById('menu-start');
 
 const store = createGameStore({ width: canvas.width, height: canvas.height });
 
@@ -28,6 +30,7 @@ function resetGame() {
   store.state.menuOpen = false;
   store.state.paused = false;
   renderer.render(snapshot());
+  syncMenuButtons();
 }
 
 function updateMenu(reason = 'paused') {
@@ -41,6 +44,7 @@ function updateMenu(reason = 'paused') {
   store.state.menuStatus = headline;
   store.state.menuMessage = detail;
   store.state.menuStartLabel = startLabel;
+  syncMenuButtons();
 }
 
 function openMenu(reason = 'paused') {
@@ -48,6 +52,7 @@ function openMenu(reason = 'paused') {
   store.state.paused = true;
   resetInputState(store.input);
   updateMenu(reason);
+  syncMenuButtons();
 }
 
 function closeMenu() {
@@ -55,6 +60,7 @@ function closeMenu() {
   store.state.paused = false;
   store.state.hasStarted = true;
   updateMenu();
+  syncMenuButtons();
 }
 
 function startFromMenu(reset = false) {
@@ -82,23 +88,19 @@ const controlsCleanup = bindDomControls({
   onToggleMenu: () => toggleMenu('paused'),
 });
 
-function handlePointer(event) {
-  const regions = renderer.getInteractiveRegions();
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const x = (event.clientX - rect.left) * scaleX;
-  const y = (event.clientY - rect.top) * scaleY;
-
-  const inside = (rect) => rect && x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
-
-  if (inside(regions.menuToggle)) {
-    toggleMenu('paused');
-    return;
+function syncMenuButtons() {
+  if (menuToggleButton) {
+    menuToggleButton.setAttribute('aria-pressed', store.state.menuOpen ? 'true' : 'false');
+    menuToggleButton.textContent = store.state.menuOpen ? 'Close menu' : 'Menu';
   }
 
-  if (store.state.menuOpen && inside(regions.menuStart)) {
-    startFromMenu();
+  if (menuStartButton) {
+    if (store.state.menuOpen) {
+      menuStartButton.hidden = false;
+      menuStartButton.textContent = store.state.menuStartLabel || 'Start run';
+    } else {
+      menuStartButton.hidden = true;
+    }
   }
 }
 
@@ -196,6 +198,10 @@ resizeCanvas();
 renderer.render(snapshot());
 openMenu('intro');
 updateMenu('intro');
+syncMenuButtons();
+
+menuToggleButton?.addEventListener('click', () => toggleMenu('paused'));
+menuStartButton?.addEventListener('click', () => startFromMenu());
 
 requestAnimationFrame(loop);
 
