@@ -32,6 +32,9 @@ export function createGameStore(dimensions = {}) {
     hasStarted: false,
     menuOpen: true,
     paused: true,
+    menuStatus: 'Ready to deploy',
+    menuMessage: 'Survive 3 nights, defend the crown, and unlock the shrine for faster towers.',
+    menuStartLabel: 'Start run',
     shrineUnlocked: false,
     hudText: '',
     waveTimer: 0,
@@ -65,6 +68,9 @@ export function resetGameStore(store) {
   store.state.hasStarted = true;
   store.state.menuOpen = false;
   store.state.paused = false;
+  store.state.menuStatus = 'Ready to deploy';
+  store.state.menuMessage = 'Survive 3 nights, defend the crown, and unlock the shrine for faster towers.';
+  store.state.menuStartLabel = 'Start run';
   store.state.shrineUnlocked = false;
   store.state.hudText = '';
   store.state.waveTimer = 0;

@@ -18,20 +18,10 @@ import { updateDayNight, checkEndConditions } from './systems/cycle.js';
 import { updateEnemySpawns } from './systems/spawning.js';
 
 const canvas = document.getElementById('game');
-const fxLayer = document.getElementById('fx-layer');
-const canvasWrap = document.getElementById('canvas-wrap');
-const hud = document.getElementById('hud');
-const menu = document.getElementById('game-menu');
-const menuStart = document.getElementById('menu-start');
-const menuRestart = document.getElementById('menu-restart');
-const menuClose = document.getElementById('menu-close');
-const menuStatus = document.getElementById('menu-status');
-const menuMessage = document.getElementById('menu-message');
-const menuToggle = document.getElementById('open-menu');
 
 const store = createGameStore({ width: canvas.width, height: canvas.height });
 
-const renderer = createRenderer({ canvas, fxLayer, canvasWrap, hud, colors: COLORS, onReset: () => resetGame() });
+const renderer = createRenderer({ canvas, colors: COLORS, onReset: () => resetGame() });
 
 function resetGame() {
   resetGameStore(store);
@@ -41,7 +31,6 @@ function resetGame() {
 }
 
 function updateMenu(reason = 'paused') {
-  if (!menu) return;
   const headline = reason === 'intro' ? 'Ready to deploy' : reason === 'ended' ? 'Run complete' : 'Run paused';
   const detail =
     reason === 'ended'
@@ -49,10 +38,9 @@ function updateMenu(reason = 'paused') {
       : 'Survive 3 nights, defend the crown, and unlock the shrine for faster towers.';
   const startLabel =
     store.state.ended || !store.state.hasStarted ? 'Start run' : reason === 'paused' ? 'Resume run' : 'Start run';
-  if (menuStatus) menuStatus.textContent = headline;
-  if (menuMessage) menuMessage.textContent = detail;
-  if (menuStart) menuStart.textContent = startLabel;
-  menu.classList.toggle('visible', store.state.menuOpen);
+  store.state.menuStatus = headline;
+  store.state.menuMessage = detail;
+  store.state.menuStartLabel = startLabel;
 }
 
 function openMenu(reason = 'paused') {
@@ -95,18 +83,15 @@ const controlsCleanup = bindDomControls({
 });
 
 function resizeCanvas() {
-  const wrapWidth = canvasWrap ? canvasWrap.clientWidth : canvas.parentElement?.clientWidth || canvas.width;
-  const targetWidth = Math.max(320, Math.round(wrapWidth || canvas.width));
+  const maxWidth = window.innerWidth - 20;
+  const maxHeight = window.innerHeight - 20;
+  const basedOnHeight = Math.round(maxHeight * (16 / 9));
+  const targetWidth = Math.max(320, Math.min(Math.round(maxWidth), basedOnHeight));
   const targetHeight = Math.round(targetWidth * (9 / 16));
 
   if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
     canvas.width = targetWidth;
     canvas.height = targetHeight;
-  }
-
-  if (fxLayer) {
-    fxLayer.style.width = `${canvas.width}px`;
-    fxLayer.style.height = `${canvas.height}px`;
   }
 
   updateWorldDimensions(store, canvas.width, canvas.height);
@@ -155,6 +140,9 @@ function gameStep(dt) {
   store.state.enemies = cleanupEnemies(store.state.enemies, store.world);
   updateDayNight(store.state, store.world, dt);
   checkEndConditions(store.state, store.world);
+  if (store.state.ended && !store.state.menuOpen) {
+    openMenu('ended');
+  }
   renderer.render(snapshot());
 }
 
@@ -189,10 +177,6 @@ renderer.render(snapshot());
 openMenu('intro');
 updateMenu('intro');
 
-if (menuStart) menuStart.addEventListener('click', () => startFromMenu());
-if (menuRestart) menuRestart.addEventListener('click', () => startFromMenu(true));
-if (menuClose) menuClose.addEventListener('click', () => closeMenu());
-if (menuToggle) menuToggle.addEventListener('click', () => toggleMenu());
 requestAnimationFrame(loop);
 
 window.addEventListener('beforeunload', () => {
