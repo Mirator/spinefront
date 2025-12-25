@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '../core/constants.js';
-import { createGameStore, resetGameStore } from '../state/store.js';
+import { createGameStore, resetGameStore, updateWorldDimensions } from '../state/store.js';
 import { createEnemy } from '../state/entities.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { resolveEnemyAttacks, swingSword, updateProjectiles, updateTowers } from '../systems/combat.js';
@@ -209,5 +209,17 @@ describe('game logic systems', () => {
     expect(thirdWave).toHaveLength(1);
     expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
     expect(state.waveTimer).toBeCloseTo(expectedInterval, 5);
+  });
+
+  it('preserves camera dimensions on reset after resizing the world', () => {
+    const store = createGameStore();
+    updateWorldDimensions(store, 1280, 720);
+    const previousCamera = { ...store.camera };
+
+    resetGameStore(store);
+
+    expect(store.camera.w).toBe(previousCamera.w);
+    expect(store.camera.h).toBe(previousCamera.h);
+    expect(store.camera.y).toBe(store.world.height - store.camera.h);
   });
 });
