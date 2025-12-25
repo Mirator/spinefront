@@ -39,6 +39,7 @@ export function createGameStore(dimensions = {}) {
     hudText: '',
     waveTimer: 0,
     waveInterval: 0,
+    currentNightNumber: null,
     enemies: [],
     projectiles: [],
     effects: createEffectsState(),
@@ -75,6 +76,7 @@ export function resetGameStore(store) {
   store.state.hudText = '';
   store.state.waveTimer = 0;
   store.state.waveInterval = 0;
+  store.state.currentNightNumber = null;
   store.state.enemies = [];
   store.state.projectiles = [];
   store.state.skyBlend = 0;
