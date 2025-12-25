@@ -65,7 +65,6 @@ The project is intended to run as a front-end app with a lightweight dev server.
 ## Controls reference
 - Move: **A/D** or **←/→**
 - Jump: **Space**
-- Ladder climb: **W/S** or **↑/↓** when on the shrine ladder
 - Sprint: Hold **Shift** while moving
 - Attack: **F** to swing your sword
 - Interact: **E** near the shrine to unlock tower tech (costs 10 gold)
