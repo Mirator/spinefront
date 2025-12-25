@@ -184,13 +184,13 @@ canvas {
 .touch-zone.joystick {
   bottom: 20px;
   left: 20px;
-  width: min(240px, 42vw);
-  height: min(240px, 42vw);
+  width: min(168px, 30vw);
+  height: min(168px, 30vw);
 }
 
 .joystick-indicator {
-  width: 76px;
-  height: 76px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: rgba(59, 130, 246, 0.25);
   border: 1px solid rgba(59, 130, 246, 0.65);
@@ -276,8 +276,8 @@ canvas {
   }
 
   .touch-zone.joystick {
-    width: min(210px, 40vw);
-    height: min(210px, 40vw);
+    width: min(147px, 28vw);
+    height: min(147px, 28vw);
     bottom: 14px;
     left: 14px;
   }
