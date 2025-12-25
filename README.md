@@ -13,6 +13,8 @@ Spinefront is a fast-paced cooperative action builder where players push a conte
 - Defeat: touch an enemy while carrying the crown (player contact drops the crown and ends the run).
 - Restart: click the HUD restart button or press **R** at any time.
 - Game menu: opens automatically on page load and can be reopened with **Esc** or the header **Menu** button. The menu pauses gameplay, lists objectives and controls, and lets you start or restart a run.
+- Responsive viewport: the canvas scales to your browser size and includes a header **Go fullscreen** toggle for an immersive layout.
+- Touch-friendly overlays: a virtual joystick (with a fallback d-pad) and on-screen Jump/Attack/Interact buttons appear on small or touch devices and disable automatically when the menu is open.
 
 ## Running the project locally
 The project is intended to run as a front-end app with a lightweight dev server.
@@ -69,6 +71,8 @@ The project is intended to run as a front-end app with a lightweight dev server.
 - Interact: **E** near the shrine to unlock tower tech (costs 10 gold)
 - Reset: **R** to restart immediately; a Restart button also appears after win/lose
 - Menu: **Esc** or the header **Menu** button to open the in-game menu (pauses the run; start or restart from there)
+- Fullscreen: Click **Go fullscreen** in the top chrome bar to enter or exit fullscreen; the canvas will resize to fit your display.
+- Touch/mobile: Drag the on-screen joystick (or use the d-pad fallback) to move, and tap the Jump, Attack, and Interact buttons for actions when using a touch device.
 
 ## Project structure
 - `src/core`: shared constants and input helpers.
