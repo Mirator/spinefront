@@ -1,5 +1,4 @@
 import { COLORS } from '../core/constants.js';
-import { clamp } from './math.js';
 import { addHitFlash, triggerDangerFlash, triggerScreenShake } from './effects.js';
 
 export function overlaps(a, b) {
@@ -11,15 +10,60 @@ export function applyDamage(target, amount) {
   return target.hp;
 }
 
+function normalizeAngle(angle) {
+  const twoPi = Math.PI * 2;
+  return ((angle % twoPi) + twoPi) % twoPi;
+}
+
+function angleWithinSweep(angle, start, end, dir) {
+  const twoPi = Math.PI * 2;
+  const normalizedAngle = normalizeAngle(angle);
+  let startAngle = normalizeAngle(start);
+  let endAngle = normalizeAngle(end);
+  if (dir > 0) {
+    if (endAngle < startAngle) endAngle += twoPi;
+    const adjusted = normalizedAngle < startAngle ? normalizedAngle + twoPi : normalizedAngle;
+    return adjusted >= startAngle && adjusted <= endAngle;
+  }
+  if (endAngle > startAngle) endAngle -= twoPi;
+  const adjusted = normalizedAngle > startAngle ? normalizedAngle - twoPi : normalizedAngle;
+  return adjusted <= startAngle && adjusted >= endAngle;
+}
+
+function computeSwingBounds(player) {
+  const dir = player.swingFacing;
+  const cx = player.x + player.w / 2 + dir * (player.w * 0.35);
+  const cy = player.y + player.h * 0.55;
+  const radius = player.h * 0.95;
+  const swingSweep = Math.PI;
+  const startAngle = dir > 0 ? -Math.PI * 0.65 : Math.PI * 1.65;
+  const endAngle = startAngle + swingSweep * dir;
+  const candidateAngles = [startAngle, endAngle, 0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2].filter((angle) =>
+    angleWithinSweep(angle, startAngle, endAngle, dir),
+  );
+  const xs = [];
+  const ys = [];
+  candidateAngles.forEach((angle) => {
+    xs.push(cx + Math.cos(angle) * radius);
+    ys.push(cy + Math.sin(angle) * radius);
+  });
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const padding = 8;
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    w: maxX - minX + padding * 2,
+    h: maxY - minY + padding * 2,
+  };
+}
+
 export function swingSword(player, enemies, damage = 25, callbacks = {}) {
   player.swingTimer = player.swingDuration;
   player.swingFacing = player.facing;
-  const arc = {
-    x: player.x + (player.swingFacing > 0 ? player.w : -24),
-    y: player.y,
-    w: 32,
-    h: player.h,
-  };
+  const arc = computeSwingBounds(player);
   const hits = [];
   enemies.forEach((enemy) => {
     if (enemy.hp > 0 && overlaps(arc, enemy)) {
