@@ -12,6 +12,7 @@ import {
   cleanupEnemies,
   resolveEnemyAttacks,
   swingSword,
+  updateSwordCollision,
   updateProjectiles,
   updateTowers,
 } from './systems/combat.js';
@@ -192,17 +193,23 @@ function gameStep(dt) {
     return renderer.render(snapshot());
   }
 
+  const swordCallbacks = {
+    onHit: (enemy) => {
+      const centerX = enemy.x + enemy.w / 2;
+      const centerY = enemy.y + enemy.h / 2;
+      addHitFlash(store.state.effects, centerX, centerY, store.world.width, store.world.height);
+      triggerScreenShake(store.state.effects, 5, 0.22);
+      triggerSlowdown(store.state.effects, 0.18, 0.55);
+    },
+  };
+
   const swung = applyInputToPlayer(store.player, store.input, store.state, store.shrine, store.towers);
   if (swung) {
-    swingSword(store.player, store.state.enemies, 25, {
-      onHit: (enemy) => {
-        const centerX = enemy.x + enemy.w / 2;
-        const centerY = enemy.y + enemy.h / 2;
-        addHitFlash(store.state.effects, centerX, centerY, store.world.width, store.world.height);
-        triggerScreenShake(store.state.effects, 5, 0.22);
-        triggerSlowdown(store.state.effects, 0.18, 0.55);
-      },
-    });
+    swingSword(store.player, store.state.enemies, 25, swordCallbacks);
+  }
+
+  if (store.player.swingTimer > 0) {
+    updateSwordCollision(store.player, store.state.enemies, swordCallbacks);
   }
 
   updatePlayer(store.player, store.world, dt, store.shrine);

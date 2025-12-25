@@ -11,18 +11,29 @@ export function applyDamage(target, amount) {
   return target.hp;
 }
 
-export function swingSword(player, enemies, damage = 25, callbacks = {}) {
-  player.swingTimer = player.swingDuration;
-  player.swingFacing = player.facing;
-  const arc = {
-    x: player.x + (player.swingFacing > 0 ? player.w : -24),
-    y: player.y,
-    w: 32,
-    h: player.h,
-  };
+function getSwordArc(player) {
   const hits = [];
+  return {
+    arc: {
+      x: player.x + (player.swingFacing > 0 ? player.w : -24),
+      y: player.y,
+      w: 32,
+      h: player.h,
+    },
+    hits,
+  };
+}
+
+export function updateSwordCollision(player, enemies, callbacks = {}, damage = 25) {
+  if (player.swingTimer <= 0) return [];
+  if (!player.swingHitIds) {
+    player.swingHitIds = new Set();
+  }
+  const { arc, hits } = getSwordArc(player);
   enemies.forEach((enemy) => {
     if (enemy.hp > 0 && overlaps(arc, enemy)) {
+      if (player.swingHitIds.has(enemy)) return;
+      player.swingHitIds.add(enemy);
       applyDamage(enemy, damage);
       const knockback = player.swingFacing * 220;
       enemy.vx = knockback;
@@ -35,6 +46,13 @@ export function swingSword(player, enemies, damage = 25, callbacks = {}) {
     }
   });
   return hits;
+}
+
+export function swingSword(player, enemies, damage = 25, callbacks = {}) {
+  player.swingTimer = player.swingDuration;
+  player.swingFacing = player.facing;
+  player.swingHitIds = new Set();
+  return updateSwordCollision(player, enemies, callbacks, damage);
 }
 
 export function resolveEnemyAttacks(enemies, targets, dt) {
