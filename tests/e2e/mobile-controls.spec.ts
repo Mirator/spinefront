@@ -22,7 +22,6 @@ test.describe('mobile controls', () => {
       { locator: page.locator('#control-jump'), text: 'Jump' },
       { locator: page.locator('#control-attack'), text: 'Attack' },
       { locator: page.locator('#control-interact'), text: 'Interact' },
-      { locator: page.locator('#control-restart'), text: 'Restart' },
     ];
 
     for (const { locator, text, label } of buttons) {
@@ -45,9 +44,11 @@ test.describe('mobile controls', () => {
     await expect(attack).toHaveClass(/pressed/);
     await attack.dispatchEvent('pointerup');
     await expect(attack).not.toHaveClass(/pressed/);
+
+    await expect(page.locator('#control-restart')).toHaveCount(0);
   });
 
-  test('restart control triggers reset flow', async ({ page }, testInfo) => {
+  test('keyboard restart binding resets the scene', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== MOBILE_PROJECT, 'Runs only in the mobile project');
     await page.setViewportSize({ width: 640, height: 900 });
     await page.goto('/');
@@ -63,11 +64,10 @@ test.describe('mobile controls', () => {
     };
 
     await page.waitForSelector('.mobile-controls');
+    await page.click('canvas#game');
     const before = await sampleCenterPixel();
 
-    const restart = page.locator('#control-restart');
-    await restart.dispatchEvent('pointerdown');
-    await restart.dispatchEvent('pointerup');
+    await page.keyboard.press('r');
     await page.waitForTimeout(200);
 
     const after = await sampleCenterPixel();
