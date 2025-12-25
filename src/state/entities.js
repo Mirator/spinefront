@@ -1,9 +1,12 @@
-import { BASE_POSITIONS, WORLD_DEFAULTS } from '../core/constants.js';
+import { BASE_POSITIONS, BASE_WORLD, WORLD_DEFAULTS } from '../core/constants.js';
 
 export function createPlayer(world) {
+  const widthRatio = world.width / BASE_WORLD.width;
+  const baseX = typeof BASE_POSITIONS.player === 'number' ? BASE_POSITIONS.player : BASE_WORLD.width / 2 - 14;
+  const scaledX = baseX * widthRatio;
   return {
     type: 'player',
-    x: world.width / 2 - 14,
+    x: scaledX,
     y: world.ground - 40,
     w: 28,
     h: 40,
