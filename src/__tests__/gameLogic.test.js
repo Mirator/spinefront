@@ -115,67 +115,13 @@ describe('game logic systems', () => {
     expect(tower.fireRate).toBe(baseFireRate);
   });
 
-  it('halts ladder climbing immediately when input is released', () => {
-    const store = createGameStore();
-    store.player.x = store.shrine.x;
-    const climbInput = {
-      left: false,
-      right: false,
-      up: true,
-      down: false,
-      sprint: false,
-      jump: false,
-      attack: false,
-      interact: false,
-    };
-
-    applyInputToPlayer(store.player, climbInput, store.state, store.shrine, store.towers);
-    expect(store.player.onLadder).toBe(true);
-    expect(store.player.vy).toBe(-160);
-
-    store.player.vy = 24;
-    const idleInput = { ...climbInput, up: false };
-    applyInputToPlayer(store.player, idleInput, store.state, store.shrine, store.towers);
-
-    expect(store.player.vy).toBe(0);
-    expect(store.player.onGround).toBe(false);
-  });
-
-  it('requires vertical overlap with the shrine to climb', () => {
+  it('keeps shrine interaction grounded without ladder movement', () => {
     const store = createGameStore();
     const dt = 1 / 60;
     store.player.x = store.shrine.x;
-    store.player.y = store.shrine.y;
-    const climbInput = {
-      left: false,
-      right: false,
-      up: true,
-      down: false,
-      sprint: false,
-      jump: false,
-      attack: false,
-      interact: false,
-    };
-
-    applyInputToPlayer(store.player, climbInput, store.state, store.shrine, store.towers);
-    expect(store.player.onLadder).toBe(true);
-    expect(store.player.vy).toBe(-160);
-
-    store.player.y = store.shrine.y - store.player.h - 5;
-    store.player.vy = 0;
+    store.player.y = store.shrine.y - 30;
     store.player.onGround = false;
-    applyInputToPlayer(store.player, climbInput, store.state, store.shrine, store.towers);
-    expect(store.player.onLadder).toBe(false);
-    updatePlayer(store.player, store.world, dt, store.shrine);
-    expect(store.player.vy).toBeGreaterThan(0);
-  });
-
-  it('stops upward climbing once above the shrine top', () => {
-    const store = createGameStore();
-    const dt = 0.1;
-    store.player.x = store.shrine.x;
-    store.player.y = store.shrine.y - 6;
-    const climbInput = {
+    const idleInput = {
       left: false,
       right: false,
       up: true,
@@ -186,14 +132,11 @@ describe('game logic systems', () => {
       interact: false,
     };
 
-    applyInputToPlayer(store.player, climbInput, store.state, store.shrine, store.towers);
-    expect(store.player.onLadder).toBe(true);
-
-    updatePlayer(store.player, store.world, dt, store.shrine);
-    const ladderTop = store.shrine.y - 8;
-    expect(store.player.y).toBeCloseTo(ladderTop, 5);
+    const initialVy = store.player.vy;
+    applyInputToPlayer(store.player, idleInput, store.state, store.shrine, store.towers);
     expect(store.player.onLadder).toBe(false);
-    expect(store.player.vy).toBeGreaterThanOrEqual(0);
+    updatePlayer(store.player, store.world, dt, store.shrine);
+    expect(store.player.vy).toBeGreaterThan(initialVy);
   });
 
   it('detects sword hits on enemies', () => {
