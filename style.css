@@ -189,3 +189,15 @@ canvas {
     display: flex;
   }
 }
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  .mobile-controls {
+    display: flex;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .mobile-controls .mobile-cluster {
+    gap: 8px;
+  }
+}
