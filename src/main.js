@@ -36,6 +36,7 @@ function resetGame() {
   store.state.menuOpen = false;
   store.state.paused = false;
   syncMenuUiState();
+  window.dispatchEvent(new CustomEvent('spinefront:reset'));
   renderer.render(snapshot());
 }
 

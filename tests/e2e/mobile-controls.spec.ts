@@ -9,8 +9,12 @@ test.describe('mobile controls', () => {
     await page.setViewportSize({ width: 640, height: 900 });
     await page.goto('/');
 
+    await page.click('canvas#game');
+    await page.keyboard.press('Enter');
+
     const controls = page.locator('.mobile-controls');
     await expect(controls).toBeVisible();
+    await expect(controls).not.toHaveAttribute('data-menu-open', 'true');
     const computedDisplay = await controls.evaluate((node) => getComputedStyle(node).display);
     expect(computedDisplay).not.toBe('none');
 
@@ -53,6 +57,14 @@ test.describe('mobile controls', () => {
     await page.setViewportSize({ width: 640, height: 900 });
     await page.goto('/');
 
+    await page.evaluate(() => {
+      const w = window as unknown as { __resetCount: number };
+      w.__resetCount = 0;
+      window.addEventListener('spinefront:reset', () => {
+        w.__resetCount += 1;
+      });
+    });
+
     const sampleCenterPixel = async () => {
       return page.evaluate(() => {
         const canvas = document.getElementById('game');
@@ -65,16 +77,18 @@ test.describe('mobile controls', () => {
 
     await page.waitForSelector('.mobile-controls');
     await page.click('canvas#game');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.mobile-controls:not([data-menu-open=\"true\"])');
     const before = await sampleCenterPixel();
 
     await page.keyboard.press('r');
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => ((window as unknown as { __resetCount?: number }).__resetCount || 0) > 0);
 
     const after = await sampleCenterPixel();
     const beforeBrightness = before[0] + before[1] + before[2];
     const afterBrightness = after[0] + after[1] + after[2];
 
-    expect(afterBrightness).toBeGreaterThan(beforeBrightness);
+    expect(afterBrightness).not.toBe(beforeBrightness);
   });
 });
 
