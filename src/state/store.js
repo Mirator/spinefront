@@ -108,7 +108,7 @@ export function resetGameStore(store) {
     tower.x = clamp(tower.x, 0, store.world.width - tower.w);
     tower.y = store.world.ground - tower.h;
   });
-  resizeCamera(store.camera, store.baseWorld.width, store.baseWorld.height, store.world);
+  resizeCamera(store.camera, store.camera.w, store.camera.h, store.world);
   centerCameraOnPlayer(store.camera, store.player, store.world);
 }
 
