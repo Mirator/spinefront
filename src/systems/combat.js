@@ -24,6 +24,10 @@ export function swingSword(player, enemies, damage = 25, callbacks = {}) {
   enemies.forEach((enemy) => {
     if (enemy.hp > 0 && overlaps(arc, enemy)) {
       applyDamage(enemy, damage);
+      const knockback = player.swingFacing * 220;
+      enemy.vx = knockback;
+      enemy.stunTimer = Math.max(enemy.stunTimer || 0, 0.22);
+      enemy.x += knockback * 0.05;
       hits.push(enemy);
       if (callbacks.onHit) {
         callbacks.onHit(enemy);
@@ -37,6 +41,12 @@ export function resolveEnemyAttacks(enemies, targets, dt) {
   const events = [];
   enemies.forEach((e) => {
     if (e.hp <= 0) return;
+    if (e.stunTimer > 0) {
+      e.stunTimer = Math.max(0, e.stunTimer - dt);
+      e.x += e.vx * dt;
+      e.vx *= 0.9;
+      return;
+    }
     if (!e.target || e.target.hp <= 0) {
       e.target = targets.find((t) => t.hp > 0 && Math.abs(t.x - e.x) < 400);
     }
@@ -135,7 +145,7 @@ export function updateProjectiles(projectiles, enemies, world, effects, dt) {
       hits.push({ projectile: next, enemy: hitEnemy });
       if (effects) {
         addHitFlash(effects, hitEnemy.x + hitEnemy.w / 2, hitEnemy.y + hitEnemy.h / 2, world.width, world.height);
-        triggerScreenShake(effects, 2.6, 0.14);
+        triggerScreenShake(effects, 2.2, 0.12);
       }
     } else if (
       next.life > 0 &&
