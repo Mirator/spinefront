@@ -3,7 +3,7 @@ import { BASE_POSITIONS, WORLD_DEFAULTS } from '../core/constants.js';
 export function createPlayer(world) {
   return {
     type: 'player',
-    x: world.width * 0.125,
+    x: world.width / 2 - 14,
     y: world.ground - 40,
     w: 28,
     h: 40,
