@@ -65,30 +65,42 @@ test.describe('mobile controls', () => {
       });
     });
 
-    const sampleCenterPixel = async () => {
-      return page.evaluate(() => {
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        const x = Math.floor(canvas.width / 2);
-        const y = Math.floor(canvas.height / 2);
-        return Array.from(ctx.getImageData(x, y, 1, 1).data);
-      });
-    };
-
     await page.waitForSelector('.mobile-controls');
     await page.click('canvas#game');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.mobile-controls:not([data-menu-open=\"true\"])');
-    const before = await sampleCenterPixel();
+    await page.waitForFunction(() => {
+      const w = window as unknown as {
+        __spinefront?: { store?: { player?: { x: number } } };
+      };
+      return typeof w.__spinefront?.store?.player?.x === 'number';
+    });
+
+    const startingX = await page.evaluate(() => {
+      const w = window as unknown as { __spinefront: { store: { player: { x: number } } } };
+      return w.__spinefront.store.player.x;
+    });
+
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(300);
+    await page.keyboard.up('ArrowRight');
+
+    const movedX = await page.evaluate(() => {
+      const w = window as unknown as { __spinefront: { store: { player: { x: number } } } };
+      return w.__spinefront.store.player.x;
+    });
+    expect(movedX).toBeGreaterThan(startingX);
 
     await page.keyboard.press('r');
     await page.waitForFunction(() => ((window as unknown as { __resetCount?: number }).__resetCount || 0) > 0);
 
-    const after = await sampleCenterPixel();
-    const beforeBrightness = before[0] + before[1] + before[2];
-    const afterBrightness = after[0] + after[1] + after[2];
-
-    expect(afterBrightness).not.toBe(beforeBrightness);
+    const resetX = await page.evaluate(() => {
+      const w = window as unknown as { __spinefront: { store: { player: { x: number } } } };
+      return w.__spinefront.store.player.x;
+    });
+    expect(resetX).toBeLessThan(movedX);
+    expect(resetX).toBeGreaterThanOrEqual(startingX - 1);
+    expect(resetX).toBeLessThanOrEqual(startingX + 1);
   });
 });
 
