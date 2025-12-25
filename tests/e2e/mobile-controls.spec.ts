@@ -9,8 +9,12 @@ test.describe('mobile controls', () => {
     await page.setViewportSize({ width: 640, height: 900 });
     await page.goto('/');
 
+    await page.click('canvas#game');
+    await page.keyboard.press('Enter');
+
     const controls = page.locator('.mobile-controls');
     await expect(controls).toBeVisible();
+    await expect(controls).not.toHaveAttribute('data-menu-open', 'true');
     const computedDisplay = await controls.evaluate((node) => getComputedStyle(node).display);
     expect(computedDisplay).not.toBe('none');
 
@@ -22,7 +26,6 @@ test.describe('mobile controls', () => {
       { locator: page.locator('#control-jump'), text: 'Jump' },
       { locator: page.locator('#control-attack'), text: 'Attack' },
       { locator: page.locator('#control-interact'), text: 'Interact' },
-      { locator: page.locator('#control-restart'), text: 'Restart' },
     ];
 
     for (const { locator, text, label } of buttons) {
@@ -45,36 +48,59 @@ test.describe('mobile controls', () => {
     await expect(attack).toHaveClass(/pressed/);
     await attack.dispatchEvent('pointerup');
     await expect(attack).not.toHaveClass(/pressed/);
+
+    await expect(page.locator('#control-restart')).toHaveCount(0);
   });
 
-  test('restart control triggers reset flow', async ({ page }, testInfo) => {
+  test('keyboard restart binding resets the scene', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== MOBILE_PROJECT, 'Runs only in the mobile project');
     await page.setViewportSize({ width: 640, height: 900 });
     await page.goto('/');
 
-    const sampleCenterPixel = async () => {
-      return page.evaluate(() => {
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        const x = Math.floor(canvas.width / 2);
-        const y = Math.floor(canvas.height / 2);
-        return Array.from(ctx.getImageData(x, y, 1, 1).data);
+    await page.evaluate(() => {
+      const w = window as unknown as { __resetCount: number };
+      w.__resetCount = 0;
+      window.addEventListener('spinefront:reset', () => {
+        w.__resetCount += 1;
       });
-    };
+    });
 
     await page.waitForSelector('.mobile-controls');
-    const before = await sampleCenterPixel();
+    await page.click('canvas#game');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.mobile-controls:not([data-menu-open=\"true\"])');
+    await page.waitForFunction(() => {
+      const w = window as unknown as {
+        __spinefront?: { store?: { player?: { x: number } } };
+      };
+      return typeof w.__spinefront?.store?.player?.x === 'number';
+    });
 
-    const restart = page.locator('#control-restart');
-    await restart.dispatchEvent('pointerdown');
-    await restart.dispatchEvent('pointerup');
-    await page.waitForTimeout(200);
+    const startingX = await page.evaluate(() => {
+      const w = window as unknown as { __spinefront: { store: { player: { x: number } } } };
+      return w.__spinefront.store.player.x;
+    });
 
-    const after = await sampleCenterPixel();
-    const beforeBrightness = before[0] + before[1] + before[2];
-    const afterBrightness = after[0] + after[1] + after[2];
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(300);
+    await page.keyboard.up('ArrowRight');
 
-    expect(afterBrightness).toBeGreaterThan(beforeBrightness);
+    const movedX = await page.evaluate(() => {
+      const w = window as unknown as { __spinefront: { store: { player: { x: number } } } };
+      return w.__spinefront.store.player.x;
+    });
+    expect(movedX).toBeGreaterThan(startingX);
+
+    await page.keyboard.press('r');
+    await page.waitForFunction(() => ((window as unknown as { __resetCount?: number }).__resetCount || 0) > 0);
+
+    const resetX = await page.evaluate(() => {
+      const w = window as unknown as { __spinefront: { store: { player: { x: number } } } };
+      return w.__spinefront.store.player.x;
+    });
+    expect(resetX).toBeLessThan(movedX);
+    expect(resetX).toBeGreaterThanOrEqual(startingX - 1);
+    expect(resetX).toBeLessThanOrEqual(startingX + 1);
   });
 });
 

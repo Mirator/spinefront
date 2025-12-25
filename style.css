@@ -182,17 +182,6 @@ canvas {
   border-color: rgba(59, 130, 246, 0.5);
 }
 
-.mobile-control.ghost {
-  background: rgba(255, 255, 255, 0.06);
-  color: #d1d5db;
-}
-
-.mobile-control.ghost:active,
-.mobile-control.ghost.pressed {
-  background: rgba(248, 113, 113, 0.8);
-  border-color: rgba(248, 113, 113, 0.35);
-}
-
 @media (max-width: 640px) {
   .canvas-shell {
     width: 100vw;

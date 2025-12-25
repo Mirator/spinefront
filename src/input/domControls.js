@@ -67,7 +67,6 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
     { id: 'control-jump', onStart: () => engageUpJump('control-jump'), onEnd: () => releaseUpJump('control-jump'), ignoreEnded: true },
     { id: 'control-attack', onStart: () => (input.attack = true), onEnd: () => (input.attack = false), ignoreEnded: true },
     { id: 'control-interact', onStart: () => (input.interact = true), onEnd: () => (input.interact = false), ignoreEnded: true },
-    { id: 'control-restart', onStart: () => onReset(), onEnd: () => {}, autoRelease: true },
   ];
 
   const touchHandlers = touchControls.map((cfg) => bindTouchControl(cfg, isEnded, isMenuOpen));

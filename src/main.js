@@ -25,6 +25,14 @@ const store = createGameStore({ width: canvas.width, height: canvas.height });
 
 const renderer = createRenderer({ canvas, colors: COLORS, onReset: () => resetGame() });
 
+if (typeof window !== 'undefined') {
+  window.__spinefront = {
+    store,
+    renderer,
+    snapshot: () => snapshot(),
+  };
+}
+
 function syncMenuUiState() {
   if (!mobileControls) return;
   mobileControls.dataset.menuOpen = store.state.menuOpen ? 'true' : 'false';
@@ -36,6 +44,7 @@ function resetGame() {
   store.state.menuOpen = false;
   store.state.paused = false;
   syncMenuUiState();
+  window.dispatchEvent(new CustomEvent('spinefront:reset'));
   renderer.render(snapshot());
 }
 
