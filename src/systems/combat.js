@@ -30,15 +30,25 @@ function angleWithinSweep(angle, start, end, dir) {
   return adjusted <= startAngle && adjusted >= endAngle;
 }
 
-function computeSwingBounds(player) {
-  const dir = player.swingFacing;
+const CARDINAL_ANGLES = [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2];
+const SWING_PADDING = 8;
+
+function getSwingGeometry(player) {
+  const dir = player.swingFacing || player.facing || 1;
   const cx = player.x + player.w / 2 + dir * (player.w * 0.35);
   const cy = player.y + player.h * 0.55;
   const radius = player.h * 0.95;
+  // Use the full rendered sweep range so the collision arc mirrors the complete sword path.
   const swingSweep = Math.PI;
   const startAngle = dir > 0 ? -Math.PI * 0.65 : Math.PI * 1.65;
   const endAngle = startAngle + swingSweep * dir;
-  const candidateAngles = [startAngle, endAngle, 0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2].filter((angle) =>
+
+  return { cx, cy, radius, dir, startAngle, endAngle };
+}
+
+function computeSwingBounds(geometry) {
+  const { cx, cy, radius, dir, startAngle, endAngle } = geometry;
+  const candidateAngles = [startAngle, endAngle, ...CARDINAL_ANGLES].filter((angle) =>
     angleWithinSweep(angle, startAngle, endAngle, dir),
   );
   const xs = [];
@@ -51,24 +61,18 @@ function computeSwingBounds(player) {
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-  const padding = 8;
   return {
-    x: minX - padding,
-    y: minY - padding,
-    w: maxX - minX + padding * 2,
-    h: maxY - minY + padding * 2,
+    x: minX - SWING_PADDING,
+    y: minY - SWING_PADDING,
+    w: maxX - minX + SWING_PADDING * 2,
+    h: maxY - minY + SWING_PADDING * 2,
   };
 }
 
-export function swingSword(player, enemies, damage = 25, callbacks = {}) {
-  player.swingTimer = player.swingDuration;
-  player.swingFacing = player.facing;
-  const arc = computeSwingBounds(player);
-  const hits = [];
-  return {
-    arc: computeSwingBounds(player),
-    hits,
-  };
+function getSwordArc(player) {
+  const geometry = getSwingGeometry(player);
+  const arc = computeSwingBounds(geometry);
+  return { arc, hits: [] };
 }
 
 export function updateSwordCollision(player, enemies, callbacks = {}, damage = 25) {
