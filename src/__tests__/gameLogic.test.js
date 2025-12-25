@@ -151,6 +151,28 @@ describe('game logic systems', () => {
     expect(enemy.hp).toBe(25);
   });
 
+  it('hits enemies near the visible sword arc edges', () => {
+    [1, -1].forEach((facing) => {
+      const store = createGameStore();
+      store.player.facing = facing;
+      const radius = store.player.h * 0.95;
+      const cx = store.player.x + store.player.w / 2 + facing * (store.player.w * 0.35);
+      const cy = store.player.y + store.player.h * 0.55;
+      const startAngle = facing > 0 ? -Math.PI * 0.65 : Math.PI * 1.65;
+      const endAngle = startAngle + Math.PI * facing;
+      [startAngle, endAngle].forEach((angle) => {
+        const enemy = createEnemy('left', store.world);
+        enemy.x = cx + Math.cos(angle) * radius - enemy.w / 2;
+        enemy.y = cy + Math.sin(angle) * radius - enemy.h / 2;
+        store.state.enemies.push(enemy);
+      });
+
+      const hits = swingSword(store.player, store.state.enemies, 25);
+      expect(hits).toHaveLength(2);
+      hits.forEach((hitEnemy) => expect(hitEnemy.hp).toBeLessThan(50));
+    });
+  });
+
   it('handles projectile and enemy collisions', () => {
     const store = createGameStore();
     const enemy = createEnemy('left', store.world);

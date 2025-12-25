@@ -1,5 +1,4 @@
 import { COLORS } from '../core/constants.js';
-import { clamp } from './math.js';
 import { addHitFlash, triggerDangerFlash, triggerScreenShake } from './effects.js';
 
 export function overlaps(a, b) {
@@ -48,15 +47,23 @@ function computeSwingBounds(player) {
     xs.push(cx + Math.cos(angle) * radius);
     ys.push(cy + Math.sin(angle) * radius);
   });
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const padding = 8;
   return {
-    x: Math.min(...xs),
-    y: Math.min(...ys),
-    w: Math.max(...xs) - Math.min(...xs),
-    h: Math.max(...ys) - Math.min(...ys),
+    x: minX - padding,
+    y: minY - padding,
+    w: maxX - minX + padding * 2,
+    h: maxY - minY + padding * 2,
   };
 }
 
-function getSwordArc(player) {
+export function swingSword(player, enemies, damage = 25, callbacks = {}) {
+  player.swingTimer = player.swingDuration;
+  player.swingFacing = player.facing;
+  const arc = computeSwingBounds(player);
   const hits = [];
   return {
     arc: computeSwingBounds(player),
