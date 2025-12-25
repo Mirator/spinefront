@@ -1,16 +1,17 @@
-import { BASE_POSITIONS, BASE_WORLD, ECONOMY, WORLD_DEFAULTS } from '../core/constants.js';
+import { BASE_POSITIONS, BASE_WORLD, ECONOMY, WORLD_DEFAULTS, WORLD_SCALE } from '../core/constants.js';
 import { createEffectsState } from '../systems/effects.js';
 import { createInputState, resetInputState } from '../core/input.js';
 import { clamp } from '../systems/math.js';
 import { createPlayer, createStructureSets, createWall, createTower } from './entities.js';
+import { createCamera, resizeCamera } from './camera.js';
 
 export function createWorld(dimensions = {}) {
-  const width = dimensions.width || BASE_WORLD.width;
-  const height = dimensions.height || BASE_WORLD.height;
+  const width = (dimensions.width || BASE_WORLD.width) * WORLD_SCALE.x;
+  const height = (dimensions.height || BASE_WORLD.height) * WORLD_SCALE.y;
   return {
     width,
     height,
-    ground: height - BASE_WORLD.groundMargin,
+    ground: height - BASE_WORLD.groundMargin * WORLD_SCALE.y,
     gravity: WORLD_DEFAULTS.gravity,
     dayLength: WORLD_DEFAULTS.dayLength,
     nightsToWin: WORLD_DEFAULTS.nightsToWin,
@@ -21,6 +22,7 @@ export function createGameStore(dimensions = {}) {
   const world = createWorld(dimensions);
   const { walls, towers, shrine } = createStructureSets(world, BASE_WORLD);
   const player = createPlayer(world);
+  const camera = createCamera(dimensions.width || BASE_WORLD.width, dimensions.height || BASE_WORLD.height, world);
   const state = {
     time: 0,
     dayTimer: 0,
@@ -55,6 +57,7 @@ export function createGameStore(dimensions = {}) {
     shrine,
     state,
     input: createInputState(),
+    camera,
   };
 }
 
@@ -104,16 +107,19 @@ export function resetGameStore(store) {
     tower.x = clamp(tower.x, 0, store.world.width - tower.w);
     tower.y = store.world.ground - tower.h;
   });
+  resizeCamera(store.camera, store.baseWorld.width, store.baseWorld.height, store.world);
 }
 
 export function updateWorldDimensions(store, width, height) {
-  const widthRatio = width / store.baseWorld.width;
-  const heightRatio = height / store.baseWorld.height;
+  const scaledWidth = width * WORLD_SCALE.x;
+  const scaledHeight = height * WORLD_SCALE.y;
+  const widthRatio = scaledWidth / store.baseWorld.width;
+  const heightRatio = scaledHeight / store.baseWorld.height;
 
-  store.world.width = width;
-  store.world.height = height;
+  store.world.width = scaledWidth;
+  store.world.height = scaledHeight;
   const groundMargin = store.baseWorld.groundMargin * heightRatio;
-  store.world.ground = Math.max(height - groundMargin, height * 0.6);
+  store.world.ground = Math.max(scaledHeight - groundMargin, scaledHeight * 0.6);
 
   store.walls.forEach((wall, idx) => {
     const baseX = (store.baseWorld.walls || [])[idx];
@@ -140,4 +146,5 @@ export function updateWorldDimensions(store, width, height) {
     enemy.x = clamp(enemy.x, -140, store.world.width + 140);
     enemy.y = Math.min(enemy.y, store.world.ground - enemy.h);
   });
+  resizeCamera(store.camera, width, height, store.world);
 }

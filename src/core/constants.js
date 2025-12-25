@@ -4,6 +4,11 @@ export const BASE_WORLD = {
   groundMargin: 80,
 };
 
+export const WORLD_SCALE = {
+  x: 4,
+  y: 2,
+};
+
 export const WORLD_DEFAULTS = {
   gravity: 1800,
   dayLength: 30,

@@ -2,6 +2,7 @@ import { COLORS } from './core/constants.js';
 import { resetInputState } from './core/input.js';
 import { bindDomControls } from './input/domControls.js';
 import { createGameStore, resetGameStore, updateWorldDimensions } from './state/store.js';
+import { updateCamera } from './state/camera.js';
 import { createEnemy } from './state/entities.js';
 import { createRenderer } from './render/renderer.js';
 import { addHitFlash, triggerScreenShake, updateEffects } from './systems/effects.js';
@@ -173,6 +174,7 @@ function resizeCanvas() {
 function snapshot() {
   return {
     world: store.world,
+    camera: store.camera,
     state: store.state,
     player: store.player,
     shrine: store.shrine,
@@ -203,6 +205,7 @@ function gameStep(dt) {
   }
 
   updatePlayer(store.player, store.world, dt, store.shrine);
+  updateCamera(store.camera, store.player, store.world);
   resolveEnemyAttacks(store.state.enemies, [...store.walls, ...store.towers], dt);
   updateTowers(store.towers, store.state.enemies, store.state.projectiles, store.state.shrineUnlocked, dt);
 
