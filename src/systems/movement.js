@@ -15,8 +15,13 @@ export function applyInputToPlayer(player, input, state, shrine, towers) {
     player.facing = 1;
   }
 
-  if (player.onLadder && (input.up || input.down)) {
-    player.vy = (input.up ? -1 : 1) * 160;
+  if (player.onLadder) {
+    if (input.up || input.down) {
+      player.vy = (input.up ? -1 : 1) * 160;
+    } else {
+      player.vy = 0;
+      player.onGround = false;
+    }
   } else if (player.onGround && input.jump) {
     player.vy = -player.jumpForce;
     player.onGround = false;

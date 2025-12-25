@@ -115,6 +115,32 @@ describe('game logic systems', () => {
     expect(tower.fireRate).toBe(baseFireRate);
   });
 
+  it('halts ladder climbing immediately when input is released', () => {
+    const store = createGameStore();
+    store.player.x = store.shrine.x;
+    const climbInput = {
+      left: false,
+      right: false,
+      up: true,
+      down: false,
+      sprint: false,
+      jump: false,
+      attack: false,
+      interact: false,
+    };
+
+    applyInputToPlayer(store.player, climbInput, store.state, store.shrine, store.towers);
+    expect(store.player.onLadder).toBe(true);
+    expect(store.player.vy).toBe(-160);
+
+    store.player.vy = 24;
+    const idleInput = { ...climbInput, up: false };
+    applyInputToPlayer(store.player, idleInput, store.state, store.shrine, store.towers);
+
+    expect(store.player.vy).toBe(0);
+    expect(store.player.onGround).toBe(false);
+  });
+
   it('detects sword hits on enemies', () => {
     const store = createGameStore();
     const enemy = createEnemy('left', store.world);
