@@ -1,4 +1,4 @@
-import { COLORS } from '../core/constants.js';
+import { COLORS, ECONOMY } from '../core/constants.js';
 import { clamp, hexToRgb, lerpColor } from '../systems/math.js';
 
 function drawRoundedRect(ctx, x, y, w, h, r = 12) {
@@ -25,6 +25,9 @@ function shadeColor(hex, factor) {
   };
   return `rgb(${adjust(r)}, ${adjust(g)}, ${adjust(b)})`;
 }
+
+const shrineCostText = () => `${ECONOMY.shrineCost} gold`;
+const shrineHelpCopy = () => `Unlock shrine tech for ${shrineCostText()} to speed up tower fire rate.`;
 
 export function createRenderer({ canvas, colors = COLORS }) {
   const ctx = canvas.getContext('2d');
@@ -447,7 +450,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const shrineLine = state.shrineUnlocked
       ? 'Shrine: Unlocked — towers fire faster'
       : nearShrine
-        ? `E: Unlock shrine (10 gold)${state.currency < 10 ? ' — need gold' : ''}`
+        ? `E: Unlock shrine (${shrineCostText()})${state.currency < ECONOMY.shrineCost ? ' — need gold' : ''}`
         : 'Shrine: Locked (approach to unlock)';
     hudLines.push(shrineLine);
     if (state.hudText) {
@@ -562,7 +565,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const items = [
       'Win by surviving 3 nights.',
       'Keep walls and towers standing to slow the horde.',
-      'Unlock shrine tech for 10 gold to speed up tower fire rate.',
+      shrineHelpCopy(),
       'Income arrives at dawn (+10) and at the start of each night (+5).',
     ];
     items.forEach((line, idx) => {
