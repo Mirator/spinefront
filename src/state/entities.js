@@ -77,6 +77,7 @@ export function createEnemy(side, world) {
     attack: 12,
     attackRate: 1,
     attackTimer: 0,
+    stunTimer: 0,
     target: null,
     hp: 50,
   };
