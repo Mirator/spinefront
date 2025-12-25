@@ -341,7 +341,8 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const actions = [
       'Open/close menu: Esc',
       'Restart: R',
-      'Tap buttons on canvas on mobile',
+      'Mobile: Drag left pad to move/up/down',
+      'Mobile: Right buttons: Jump / Attack / Interact',
     ];
     actions.forEach((line, idx) => {
       ctx.fillText(line, panelX + 18, panelY + 178 + idx * 18);
