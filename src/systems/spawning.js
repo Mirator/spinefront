@@ -4,6 +4,10 @@ export function spawnEnemy(state, side, createEnemy) {
   return enemy;
 }
 
+export function calculateWaveInterval(nightNumber) {
+  return Math.max(1.5, 3.5 - nightNumber);
+}
+
 export function updateEnemySpawns(state, world, createEnemy, dt) {
   if (!state.isNight) return [];
   state.waveTimer -= dt;
@@ -12,8 +16,10 @@ export function updateEnemySpawns(state, world, createEnemy, dt) {
     const side = Math.random() > 0.5 ? 'left' : 'right';
     const enemy = createEnemy(side);
     state.enemies.push(enemy);
-    state.waveInterval = Math.max(1.5, 3.5 - state.nightsSurvived);
-    state.waveTimer = state.waveInterval;
+    const nightNumber = state.currentNightNumber || state.nightsSurvived + 1;
+    const interval = state.waveInterval > 0 ? state.waveInterval : calculateWaveInterval(nightNumber);
+    state.waveInterval = interval;
+    state.waveTimer = interval;
     spawned.push(enemy);
   }
   return spawned;

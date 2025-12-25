@@ -5,7 +5,7 @@ import { createEnemy } from '../state/entities.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { resolveEnemyAttacks, swingSword, updateProjectiles, updateTowers } from '../systems/combat.js';
 import { applyInputToPlayer } from '../systems/movement.js';
-import { updateEnemySpawns } from '../systems/spawning.js';
+import { calculateWaveInterval, updateEnemySpawns } from '../systems/spawning.js';
 
 describe('game logic systems', () => {
   it('awards currency per cycle and ends after enough nights', () => {
@@ -188,5 +188,28 @@ describe('game logic systems', () => {
     expect(store.state.shrineUnlocked).toBe(false);
     expect(store.state.enemies).toHaveLength(0);
     expect(store.player.crown).toBe(true);
+  });
+
+  it('keeps wave intervals consistent within a single night', () => {
+    const store = createGameStore();
+    const { state, world } = store;
+    state.isNight = true;
+    state.currentNightNumber = 2;
+    state.waveInterval = calculateWaveInterval(state.currentNightNumber);
+    state.waveTimer = 0;
+    const expectedInterval = state.waveInterval;
+
+    const firstWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), 0);
+    expect(firstWave).toHaveLength(1);
+    expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
+
+    const secondWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval);
+    expect(secondWave).toHaveLength(1);
+    expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
+
+    const thirdWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval);
+    expect(thirdWave).toHaveLength(1);
+    expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
+    expect(state.waveTimer).toBeCloseTo(expectedInterval, 5);
   });
 });
