@@ -130,16 +130,16 @@ canvas {
 }
 
 .mobile-control {
-  min-width: 120px;
-  min-height: 72px;
-  padding: 12px 16px;
-  border-radius: 18px;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 7px 10px;
+  border-radius: 11px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(15, 23, 42, 0.75);
   color: #e5e7eb;
-  font-size: 16px;
+  font-size: 10px;
   font-weight: 700;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 7px 17px rgba(0, 0, 0, 0.28);
   cursor: pointer;
   transition: transform 0.08s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
@@ -222,11 +222,11 @@ canvas {
 }
 
 .actions-row.primary-actions .mobile-control {
-  min-width: 128px;
+  min-width: 77px;
 }
 
 .actions-row.secondary-actions .mobile-control {
-  min-width: 136px;
+  min-width: 82px;
 }
 
 .legacy-dpad {
@@ -289,6 +289,6 @@ canvas {
   }
 
   .mobile-control {
-    min-height: 68px;
+    min-height: 41px;
   }
 }
