@@ -202,7 +202,7 @@ function gameStep(dt) {
     });
   }
 
-  updatePlayer(store.player, store.world, dt);
+  updatePlayer(store.player, store.world, dt, store.shrine);
   resolveEnemyAttacks(store.state.enemies, [...store.walls, ...store.towers], dt);
   updateTowers(store.towers, store.state.enemies, store.state.projectiles, store.state.shrineUnlocked, dt);
 
