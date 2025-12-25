@@ -22,8 +22,8 @@ export const ECONOMY = {
 };
 
 export const BASE_POSITIONS = {
-  walls: [260, 640],
-  towers: [280, 620],
+  walls: [450, 510],
+  towers: [430, 530],
 };
 
 export const COLORS = {
