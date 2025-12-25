@@ -117,6 +117,20 @@ canvas {
   padding: 16px;
   pointer-events: none;
   gap: 16px;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+}
+
+.mobile-controls.is-menu-open,
+.mobile-controls[data-menu-open='true'] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mobile-controls.is-menu-open .mobile-cluster,
+.mobile-controls[data-menu-open='true'] .mobile-cluster {
+  pointer-events: none;
 }
 
 .mobile-controls .mobile-cluster {

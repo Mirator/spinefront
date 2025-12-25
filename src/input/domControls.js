@@ -70,7 +70,7 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
     { id: 'control-restart', onStart: () => onReset(), onEnd: () => {}, autoRelease: true },
   ];
 
-  const touchHandlers = touchControls.map((cfg) => bindTouchControl(cfg, isEnded));
+  const touchHandlers = touchControls.map((cfg) => bindTouchControl(cfg, isEnded, isMenuOpen));
 
   return () => {
     document.removeEventListener('keydown', keydown);
@@ -79,12 +79,19 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
   };
 }
 
-function bindTouchControl(config, isEnded) {
+function bindTouchControl(config, isEnded, isMenuOpen = () => false) {
   const { id, onStart, onEnd, ignoreEnded = false, autoRelease = false } = config;
   const el = document.getElementById(id);
   if (!el) return () => {};
+
+  const menuOpen = () => Boolean(isMenuOpen && isMenuOpen());
+
   const handleStart = (e) => {
     e.preventDefault();
+    if (menuOpen()) {
+      el.classList.remove('pressed');
+      return;
+    }
     if (ignoreEnded && isEnded()) return;
     el.classList.add('pressed');
     if (typeof onStart === 'function') onStart();
@@ -95,6 +102,7 @@ function bindTouchControl(config, isEnded) {
   const handleEnd = (e) => {
     e.preventDefault();
     el.classList.remove('pressed');
+    if (menuOpen()) return;
     if (typeof onEnd === 'function') onEnd();
   };
 

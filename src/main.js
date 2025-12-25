@@ -19,15 +19,23 @@ import { updateEnemySpawns } from './systems/spawning.js';
 
 const canvas = document.getElementById('game');
 const fullscreenButton = document.getElementById('fullscreen-toggle');
+const mobileControls = document.querySelector('.mobile-controls');
 
 const store = createGameStore({ width: canvas.width, height: canvas.height });
 
 const renderer = createRenderer({ canvas, colors: COLORS, onReset: () => resetGame() });
 
+function syncMenuUiState() {
+  if (!mobileControls) return;
+  mobileControls.dataset.menuOpen = store.state.menuOpen ? 'true' : 'false';
+  mobileControls.classList.toggle('is-menu-open', store.state.menuOpen);
+}
+
 function resetGame() {
   resetGameStore(store);
   store.state.menuOpen = false;
   store.state.paused = false;
+  syncMenuUiState();
   renderer.render(snapshot());
 }
 
@@ -48,6 +56,7 @@ function openMenu(reason = 'paused') {
   store.state.menuOpen = true;
   store.state.paused = true;
   resetInputState(store.input);
+  syncMenuUiState();
   updateMenu(reason);
 }
 
@@ -55,6 +64,7 @@ function closeMenu() {
   store.state.menuOpen = false;
   store.state.paused = false;
   store.state.hasStarted = true;
+  syncMenuUiState();
   updateMenu();
 }
 
