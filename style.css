@@ -229,6 +229,36 @@ canvas {
   min-width: 136px;
 }
 
+.legacy-dpad {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
+  grid-template-rows: repeat(2, 30px);
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  opacity: 0.05;
+  pointer-events: auto;
+}
+
+.legacy-dpad .dpad-row {
+  display: contents;
+}
+
+.legacy-dpad .mobile-control {
+  min-width: 30px;
+  min-height: 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
 @media (max-width: 640px) {
   .canvas-shell {
     width: 100vw;
