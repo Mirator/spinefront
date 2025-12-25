@@ -60,21 +60,39 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
   document.addEventListener('keyup', keyup);
 
   const touchControls = [
-    { id: 'control-left', onStart: () => (input.left = true), onEnd: () => (input.left = false), ignoreEnded: true },
-    { id: 'control-right', onStart: () => (input.right = true), onEnd: () => (input.right = false), ignoreEnded: true },
     { id: 'control-up', onStart: () => engageUpJump('control-up'), onEnd: () => releaseUpJump('control-up'), ignoreEnded: true },
+    { id: 'control-left', onStart: () => (input.left = true), onEnd: () => (input.left = false), ignoreEnded: true },
     { id: 'control-down', onStart: () => (input.down = true), onEnd: () => (input.down = false), ignoreEnded: true },
+    { id: 'control-right', onStart: () => (input.right = true), onEnd: () => (input.right = false), ignoreEnded: true },
     { id: 'control-jump', onStart: () => engageUpJump('control-jump'), onEnd: () => releaseUpJump('control-jump'), ignoreEnded: true },
     { id: 'control-attack', onStart: () => (input.attack = true), onEnd: () => (input.attack = false), ignoreEnded: true },
     { id: 'control-interact', onStart: () => (input.interact = true), onEnd: () => (input.interact = false), ignoreEnded: true },
   ];
 
   const touchHandlers = touchControls.map((cfg) => bindTouchControl(cfg, isEnded, isMenuOpen));
+  const joystickCleanup = bindVirtualJoystick({
+    id: 'control-joystick',
+    onMove: (dir) => {
+      input.left = dir.left;
+      input.right = dir.right;
+      input.up = dir.up;
+      input.down = dir.down;
+    },
+    onEnd: () => {
+      input.left = false;
+      input.right = false;
+      input.up = false;
+      input.down = false;
+    },
+    isEnded,
+    isMenuOpen,
+  });
 
   return () => {
     document.removeEventListener('keydown', keydown);
     document.removeEventListener('keyup', keyup);
     touchHandlers.forEach((cleanup) => cleanup());
+    joystickCleanup();
   };
 }
 
@@ -119,5 +137,84 @@ function bindTouchControl(config, isEnded, isMenuOpen = () => false) {
     el.removeEventListener('pointerdown', handleStart);
     el.removeEventListener('pointerup', handleEnd);
     el.removeEventListener('pointercancel', handleEnd);
+  };
+}
+
+function bindVirtualJoystick({ id, onMove, onEnd, isEnded = () => false, isMenuOpen = () => false }) {
+  const el = document.getElementById(id);
+  if (!el) return () => {};
+
+  const threshold = 18;
+  const resetDirections = () => {
+    if (typeof onEnd === 'function') onEnd();
+  };
+
+  let active = false;
+  let startX = 0;
+  let startY = 0;
+
+  const updateFromDelta = (dx, dy) => {
+    const dir = {
+      left: dx < -threshold,
+      right: dx > threshold,
+      up: dy < -threshold,
+      down: dy > threshold,
+    };
+    if (typeof onMove === 'function') onMove(dir);
+  };
+
+  const handleStart = (e) => {
+    if (e.cancelable) e.preventDefault();
+    if (isMenuOpen()) return;
+    if (isEnded()) return;
+    const point = e.touches ? e.touches[0] : e;
+    startX = point.clientX;
+    startY = point.clientY;
+    active = true;
+    el.classList.add('pressed');
+    updateFromDelta(0, 0);
+  };
+
+  const handleMove = (e) => {
+    if (e.cancelable) e.preventDefault();
+    if (!active) return;
+    if (isMenuOpen()) {
+      el.classList.remove('pressed');
+      active = false;
+      return resetDirections();
+    }
+    const point = e.touches ? e.touches[0] : e;
+    const dx = point.clientX - startX;
+    const dy = point.clientY - startY;
+    updateFromDelta(dx, dy);
+  };
+
+  const handleEnd = () => {
+    if (!active) return;
+    active = false;
+    el.classList.remove('pressed');
+    resetDirections();
+  };
+
+  el.addEventListener('touchstart', handleStart, { passive: false });
+  el.addEventListener('touchmove', handleMove, { passive: false });
+  el.addEventListener('touchend', handleEnd);
+  el.addEventListener('touchcancel', handleEnd);
+  el.addEventListener('pointerdown', handleStart);
+  el.addEventListener('pointermove', handleMove);
+  el.addEventListener('pointerup', handleEnd);
+  el.addEventListener('pointercancel', handleEnd);
+  el.addEventListener('lostpointercapture', handleEnd);
+
+  return () => {
+    el.removeEventListener('touchstart', handleStart);
+    el.removeEventListener('touchmove', handleMove);
+    el.removeEventListener('touchend', handleEnd);
+    el.removeEventListener('touchcancel', handleEnd);
+    el.removeEventListener('pointerdown', handleStart);
+    el.removeEventListener('pointermove', handleMove);
+    el.removeEventListener('pointerup', handleEnd);
+    el.removeEventListener('pointercancel', handleEnd);
+    el.removeEventListener('lostpointercapture', handleEnd);
   };
 }

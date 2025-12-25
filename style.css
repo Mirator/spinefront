@@ -112,11 +112,7 @@ canvas {
   position: absolute;
   inset: 0;
   display: none;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding: 16px;
   pointer-events: none;
-  gap: 16px;
   opacity: 1;
   visibility: visible;
   transition: opacity 0.16s ease, visibility 0.16s ease;
@@ -133,42 +129,16 @@ canvas {
   pointer-events: none;
 }
 
-.mobile-controls .mobile-cluster {
-  pointer-events: auto;
-  display: grid;
-  gap: 10px;
-}
-
-.mobile-controls .dpad {
-  grid-template-columns: repeat(3, 54px);
-  grid-template-rows: repeat(2, 54px);
-  align-items: center;
-  justify-items: center;
-}
-
-.dpad-row {
-  display: contents;
-}
-
-.mobile-controls .actions {
-  grid-template-columns: repeat(2, minmax(84px, 1fr));
-}
-
-.action-row {
-  display: contents;
-}
-
 .mobile-control {
-  width: 100%;
-  height: 54px;
-  border-radius: 14px;
+  min-width: 120px;
+  min-height: 72px;
+  padding: 12px 16px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(15, 23, 42, 0.75);
   color: #e5e7eb;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
   cursor: pointer;
   transition: transform 0.08s ease, box-shadow 0.12s ease, background 0.12s ease;
@@ -182,6 +152,113 @@ canvas {
   border-color: rgba(59, 130, 246, 0.5);
 }
 
+.touch-zone {
+  position: absolute;
+  pointer-events: auto;
+  background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.12), rgba(15, 23, 42, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  color: #e5e7eb;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.touch-zone.pressed {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.35);
+}
+
+.touch-zone .zone-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  right: 12px;
+  font-size: 13px;
+  color: rgba(229, 231, 235, 0.75);
+  text-align: center;
+  pointer-events: none;
+}
+
+.touch-zone.joystick {
+  bottom: 20px;
+  left: 20px;
+  width: min(240px, 42vw);
+  height: min(240px, 42vw);
+}
+
+.joystick-indicator {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.25);
+  border: 1px solid rgba(59, 130, 246, 0.65);
+  box-shadow: inset 0 6px 18px rgba(255, 255, 255, 0.05);
+  opacity: 0.9;
+}
+
+.actions-cluster {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: grid;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.actions-row {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.actions-row .mobile-control {
+  flex: 1;
+}
+
+.actions-row.single .mobile-control {
+  width: 100%;
+}
+
+.actions-row.primary-actions .mobile-control {
+  min-width: 128px;
+}
+
+.actions-row.secondary-actions .mobile-control {
+  min-width: 136px;
+}
+
+.legacy-dpad {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
+  grid-template-rows: repeat(2, 30px);
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  opacity: 0.05;
+  pointer-events: auto;
+}
+
+.legacy-dpad .dpad-row {
+  display: contents;
+}
+
+.legacy-dpad .mobile-control {
+  min-width: 30px;
+  min-height: 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
 @media (max-width: 640px) {
   .canvas-shell {
     width: 100vw;
@@ -189,18 +266,29 @@ canvas {
   }
 
   .mobile-controls {
-    display: flex;
+    display: block;
   }
 }
 
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
   .mobile-controls {
-    display: flex;
-    padding: 12px;
-    gap: 12px;
+    display: block;
   }
 
-  .mobile-controls .mobile-cluster {
-    gap: 8px;
+  .touch-zone.joystick {
+    width: min(210px, 40vw);
+    height: min(210px, 40vw);
+    bottom: 14px;
+    left: 14px;
+  }
+
+  .actions-cluster {
+    bottom: 14px;
+    right: 14px;
+    gap: 10px;
+  }
+
+  .mobile-control {
+    min-height: 68px;
   }
 }

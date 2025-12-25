@@ -15,7 +15,11 @@
       <div class="canvas-shell">
         <canvas id="game" width="960" height="540" aria-label="Spinefront Outpost"></canvas>
         <div class="mobile-controls" aria-hidden="true">
-          <div class="mobile-cluster dpad" role="presentation">
+          <div class="touch-zone joystick" id="control-joystick" role="presentation">
+            <div class="joystick-indicator" aria-hidden="true"></div>
+            <span class="zone-hint">Drag to move</span>
+          </div>
+          <div class="legacy-dpad" aria-hidden="true" role="presentation">
             <div class="dpad-row">
               <button id="control-up" class="mobile-control" type="button" aria-label="Jump / Move up">▲</button>
             </div>
@@ -25,12 +29,12 @@
               <button id="control-right" class="mobile-control" type="button" aria-label="Move right">▶</button>
             </div>
           </div>
-          <div class="mobile-cluster actions" role="presentation">
-            <div class="action-row">
+          <div class="actions-cluster" role="presentation">
+            <div class="actions-row primary-actions">
               <button id="control-jump" class="mobile-control" type="button">Jump</button>
               <button id="control-attack" class="mobile-control" type="button">Attack</button>
             </div>
-            <div class="action-row">
+            <div class="actions-row secondary-actions">
               <button id="control-interact" class="mobile-control" type="button">Interact</button>
             </div>
           </div>
