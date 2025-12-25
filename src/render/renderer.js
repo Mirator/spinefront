@@ -22,6 +22,15 @@ export function createRenderer({ canvas, colors = COLORS }) {
     menuToggle: null,
     menuStart: null,
   };
+  const mobileQueries = [
+    '(max-width: 640px)',
+    '(pointer: coarse) and (orientation: landscape) and (max-height: 520px)',
+  ];
+
+  const isTouchViewport = () => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return mobileQueries.some((query) => window.matchMedia(query).matches);
+  };
 
   function drawPlayer(player) {
     ctx.fillStyle = colors.player;
@@ -251,6 +260,17 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
+  function drawMobileHint() {
+    ctx.save();
+    ctx.font = '13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = 'rgba(229, 231, 235, 0.9)';
+    const text = 'Mobile: Drag left pad to move; tap Jump, Attack, or Interact on the right.';
+    ctx.fillText(text, canvas.width / 2, canvas.height - 12);
+    ctx.restore();
+  }
+
   function drawMenuToggle(state) {
     const paddingX = 12;
     const paddingY = 9;
@@ -415,7 +435,12 @@ export function createRenderer({ canvas, colors = COLORS }) {
     // UI layer (stable)
     drawHUD(snapshot);
     drawMenuToggle(state);
-    drawHelpBar();
+    const touchControlsActive = isTouchViewport();
+    if (touchControlsActive) {
+      drawMobileHint();
+    } else {
+      drawHelpBar();
+    }
     drawOutcome(state, world);
     drawMenuOverlay(snapshot);
   }
