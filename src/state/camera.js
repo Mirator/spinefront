@@ -18,6 +18,13 @@ export function resizeCamera(camera, viewWidth, viewHeight, world) {
   camera.y = anchorToGround(world, camera.h);
 }
 
+export function centerCameraOnPlayer(camera, player, world) {
+  const playerCenterX = player.x + player.w / 2;
+  const centeredX = playerCenterX - camera.w / 2;
+  camera.x = clamp(centeredX, 0, Math.max(0, world.width - camera.w));
+  camera.y = anchorToGround(world, camera.h);
+}
+
 export function updateCamera(camera, player, world) {
   const third = camera.w / 3;
   const playerCenterX = player.x + player.w / 2;

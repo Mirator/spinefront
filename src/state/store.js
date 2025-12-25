@@ -3,7 +3,7 @@ import { createEffectsState } from '../systems/effects.js';
 import { createInputState, resetInputState } from '../core/input.js';
 import { clamp } from '../systems/math.js';
 import { createPlayer, createStructureSets, createWall, createTower } from './entities.js';
-import { createCamera, resizeCamera } from './camera.js';
+import { centerCameraOnPlayer, createCamera, resizeCamera } from './camera.js';
 
 export function createWorld(dimensions = {}) {
   const width = (dimensions.width || BASE_WORLD.width) * WORLD_SCALE.x;
@@ -23,6 +23,7 @@ export function createGameStore(dimensions = {}) {
   const { walls, towers, shrine } = createStructureSets(world, BASE_WORLD);
   const player = createPlayer(world);
   const camera = createCamera(dimensions.width || BASE_WORLD.width, dimensions.height || BASE_WORLD.height, world);
+  centerCameraOnPlayer(camera, player, world);
   const state = {
     time: 0,
     dayTimer: 0,
@@ -108,6 +109,7 @@ export function resetGameStore(store) {
     tower.y = store.world.ground - tower.h;
   });
   resizeCamera(store.camera, store.baseWorld.width, store.baseWorld.height, store.world);
+  centerCameraOnPlayer(store.camera, store.player, store.world);
 }
 
 export function updateWorldDimensions(store, width, height) {
@@ -147,4 +149,5 @@ export function updateWorldDimensions(store, width, height) {
     enemy.y = Math.min(enemy.y, store.world.ground - enemy.h);
   });
   resizeCamera(store.camera, width, height, store.world);
+  centerCameraOnPlayer(store.camera, store.player, store.world);
 }
