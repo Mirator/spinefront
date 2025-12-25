@@ -364,11 +364,11 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
-  function drawCelestials(state, world) {
+  function drawCelestials(state, world, camera) {
     const phase = clamp(state.dayTimer / world.dayLength, 0, 1);
     const arcHeight = 120;
     const minX = 60;
-    const maxX = canvas.width - 60;
+    const maxX = camera.w - 60;
 
     if (!state.isNight) {
       const sunX = clamp(minX + (maxX - minX) * phase, minX, maxX);
@@ -618,40 +618,45 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
-  function drawBackground(state, world) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function drawBackground(state, world, camera) {
+    ctx.clearRect(-state.effects.shakeOffset.x, -state.effects.shakeOffset.y, canvas.width, canvas.height);
     const skyTop = lerpColor('#78bef5', '#0c1324', state.skyBlend);
     const skyBottom = lerpColor('#1e3a8a', '#0f172a', state.skyBlend);
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    const gradient = ctx.createLinearGradient(0, 0, 0, camera.h);
     gradient.addColorStop(0, skyTop);
     gradient.addColorStop(1, skyBottom);
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, camera.w, camera.h);
 
     const duskStrength = 1 - Math.abs(0.5 - state.skyBlend) * 1.8;
     if (duskStrength > 0) {
-      const dusk = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      const dusk = ctx.createLinearGradient(0, 0, 0, camera.h);
       dusk.addColorStop(0, `rgba(252, 211, 77, ${0.18 * duskStrength})`);
       dusk.addColorStop(1, `rgba(79, 70, 229, ${0.25 * duskStrength})`);
       ctx.fillStyle = dusk;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, camera.w, camera.h);
     }
 
-    drawCelestials(state, world);
+    drawCelestials(state, world, camera);
 
+    const groundY = world.ground - camera.y;
     ctx.fillStyle = lerpColor('#115e38', '#0b3323', state.skyBlend);
-    ctx.fillRect(0, world.ground, canvas.width, canvas.height - world.ground);
+    ctx.fillRect(0, groundY, camera.w, camera.h - groundY);
     ctx.fillStyle = lerpColor('#1d7048', '#124030', state.skyBlend);
-    ctx.fillRect(0, world.ground + 26, canvas.width, 16);
+    ctx.fillRect(0, groundY + 26, camera.w, 16);
   }
 
   function draw(snapshot) {
-    const { world, state, player, shrine, walls, towers, enemies, projectiles } = snapshot;
+    const { world, state, camera, player, shrine, walls, towers, enemies, projectiles } = snapshot;
+    const activeCamera = camera || { x: 0, y: 0, w: canvas.width, h: canvas.height };
 
     // World layer (shaken)
     ctx.save();
     ctx.translate(state.effects.shakeOffset.x, state.effects.shakeOffset.y);
-    drawBackground(state, world);
+    drawBackground(state, world, activeCamera);
+
+    ctx.save();
+    ctx.translate(-activeCamera.x, -activeCamera.y);
     drawShrine(shrine, state.shrineUnlocked);
     drawStructures(walls, towers);
     drawEnemies(enemies);
@@ -659,6 +664,8 @@ export function createRenderer({ canvas, colors = COLORS }) {
     drawPlayer(player);
     drawPlayerAttack(player);
     drawHitFlashes(state.effects, world);
+    ctx.restore();
+
     drawVignette(state.effects);
     ctx.restore();
 
