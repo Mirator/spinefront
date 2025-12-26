@@ -7,6 +7,7 @@ import {
   setStoreSeed,
   updateWorldDimensions,
 } from '../state/store.js';
+import { applyMenuState, createMenuStateMachine, MENU_STATES } from '../state/machine.js';
 import { updateCamera } from '../state/camera.js';
 import { addHitFlash, triggerSlowdown, updateEffects } from '../systems/effects.js';
 import { applyInputToPlayer, updatePlayer } from '../systems/movement.js';
@@ -40,6 +41,8 @@ export class GameSession {
   constructor(dimensions = {}) {
     this.store = createGameStore(dimensions);
     this.snapshot = createSnapshot(this.store);
+    this.menuMachine = createMenuStateMachine(MENU_STATES.INTRO);
+    applyMenuState(MENU_STATES.INTRO, this.store.state);
   }
 
   getSnapshot() {
@@ -64,85 +67,88 @@ export class GameSession {
     return this.store.input;
   }
 
-  updateMenu(reason = 'paused') {
-    const { state } = this.store;
-    const islandLine =
-      state.island?.bonus?.name && state.island?.bonus?.description
-        ? `${state.island.bonus.name}: ${state.island.bonus.description}`
-        : 'Hold the line on this island, then ascend.';
-    let headline = 'Run paused';
-    let detail = islandLine;
-    if (reason === 'intro') {
-      headline = 'Ready to deploy';
-    } else if (reason === 'ended') {
-      headline = 'Run complete';
-      detail = 'Defeat or victory, regroup and launch a fresh climb.';
-    } else if (reason === 'ascend') {
-      headline = `Island ${state.islandLevel} cleared`;
-      detail = 'Climb to the next sky island with what you have learned.';
+  transitionMenu(event, context = this.store.state) {
+    const result = this.menuMachine.transition(event, context);
+    if (result.changed && context.menuOpen) {
+      resetInputState(this.store.input);
     }
-    const startLabel = state.pendingAscend
-      ? 'Ascend'
-      : state.ended || !state.hasStarted
-        ? 'Start run'
-        : reason === 'paused'
-          ? 'Resume run'
-          : 'Start run';
-    state.menuStatus = headline;
-    state.menuMessage = detail;
-    state.menuStartLabel = startLabel;
+    return result;
   }
 
-  openMenu(reason = 'paused') {
+  setMenuState(stateValue, context = this.store.state) {
+    const result = this.menuMachine.set(stateValue, context);
+    if (context.menuOpen) {
+      resetInputState(this.store.input);
+    }
+    return result;
+  }
+
+  openMenu() {
     const { state } = this.store;
-    state.menuOpen = true;
-    state.paused = true;
-    resetInputState(this.store.input);
-    this.updateMenu(reason);
+    const target = state.pendingAscend ? MENU_STATES.ASCEND_READY : state.ended ? MENU_STATES.ENDED : MENU_STATES.PAUSED;
+    this.setMenuState(target);
   }
 
   closeMenu() {
     const { state } = this.store;
-    state.menuOpen = false;
-    state.paused = false;
-    state.hasStarted = true;
-    this.updateMenu();
+    if (state.menuState === MENU_STATES.PAUSED) {
+      this.transitionMenu('resume');
+    } else if (state.menuState === MENU_STATES.INTRO || state.menuState === MENU_STATES.ASCEND_READY) {
+      this.transitionMenu('start');
+    } else if (state.menuState === MENU_STATES.ENDED) {
+      this.transitionMenu('reset');
+      this.transitionMenu('start');
+    }
   }
 
-  toggleMenu(reason = 'paused') {
+  toggleMenu() {
     const { state } = this.store;
     if (state.menuOpen) {
       this.closeMenu();
+    } else if (state.ended) {
+      this.transitionMenu('end');
     } else {
-      const nextReason = state.ended ? 'ended' : reason;
-      this.openMenu(nextReason);
+      this.transitionMenu('pause');
     }
   }
 
   reset(options = {}) {
     resetGameStore(this.store, options);
-    this.store.state.menuOpen = false;
-    this.store.state.paused = false;
-    this.store.state.hasStarted = true;
-    this.updateMenu('intro');
+    this.setMenuState(MENU_STATES.INTRO);
+    this.transitionMenu('start');
     return this.getSnapshot();
   }
 
   ascend() {
     ascendGameStore(this.store);
-    this.updateMenu('ascend');
+    this.setMenuState(MENU_STATES.ASCEND_READY);
     return this.getSnapshot();
   }
 
   startFromMenu({ reset = false } = {}) {
     const { state } = this.store;
-    if (reset || state.ended || (!state.hasStarted && !state.pendingAscend)) {
+    if (reset || state.ended) {
       this.reset();
-    } else if (state.pendingAscend) {
-      this.ascend();
-      state.pendingAscend = false;
+      return;
     }
-    this.closeMenu();
+
+    if (state.menuState === MENU_STATES.PAUSED) {
+      this.transitionMenu('resume');
+      return;
+    }
+
+    if (state.menuState === MENU_STATES.ASCEND_READY || state.pendingAscend) {
+      this.ascend();
+      this.transitionMenu('start');
+      return;
+    }
+
+    if (state.menuState === MENU_STATES.INTRO || !state.hasStarted) {
+      this.transitionMenu('start');
+      return;
+    }
+
+    this.transitionMenu('start');
   }
 
   setSeed(seed) {
@@ -209,10 +215,10 @@ export class GameSession {
     updateDayNight(state, world, scaledDt);
     const outcome = checkEndConditions(state, world);
     if (outcome === 'loss' && !state.menuOpen) {
-      this.openMenu('ended');
+      this.transitionMenu('end');
     } else if (outcome === 'ascend' && !state.menuOpen) {
       state.hudText = `Island ${state.islandLevel} cleared. Ascend when ready.`;
-      this.openMenu('ascend');
+      this.transitionMenu('ascend');
     }
 
     state.time += scaledDt;
