@@ -244,7 +244,17 @@ function spawnSapperProjectile(enemy, target) {
   };
 }
 
-export function updateProjectiles(projectiles, enemies, structures = [], player, world, effects, dt, rng) {
+export function updateProjectiles(
+  projectiles,
+  enemies,
+  structures = [],
+  player,
+  world,
+  effects,
+  dt,
+  rng,
+  onPlayerHit,
+) {
   const remaining = [];
   const hits = [];
   projectiles.forEach((p) => {
@@ -254,6 +264,7 @@ export function updateProjectiles(projectiles, enemies, structures = [], player,
     next.life -= dt;
 
     let hitTarget = null;
+    let hitPlayer = false;
     const targetPool = next.faction === 'player' ? enemies : structures;
     for (const target of targetPool) {
       if (target.hp <= 0) continue;
@@ -265,19 +276,37 @@ export function updateProjectiles(projectiles, enemies, structures = [], player,
       }
     }
 
-    if (hitTarget) {
-      applyDamage(hitTarget, next.damage);
-      hits.push({ projectile: next, target: hitTarget });
-      if (effects && next.faction === 'player') {
-        addHitFlash(
-          effects,
-          hitTarget.x + hitTarget.w / 2,
-          hitTarget.y + hitTarget.h / 2,
-          world.width,
-          world.height,
-          rng,
-        );
-        triggerScreenShake(effects, 2.2, 0.12);
+    if (!hitTarget && next.faction !== 'player' && player) {
+      const withinX = next.x > player.x - next.radius && next.x < player.x + player.w + next.radius;
+      const withinY = next.y > player.y - next.radius && next.y < player.y + player.h + next.radius;
+      if (withinX && withinY) {
+        hitPlayer = true;
+      }
+    }
+
+    if (hitTarget || hitPlayer) {
+      if (hitTarget) {
+        applyDamage(hitTarget, next.damage);
+        hits.push({ projectile: next, target: hitTarget });
+        if (effects && next.faction === 'player') {
+          addHitFlash(
+            effects,
+            hitTarget.x + hitTarget.w / 2,
+            hitTarget.y + hitTarget.h / 2,
+            world.width,
+            world.height,
+            rng,
+          );
+          triggerScreenShake(effects, 2.2, 0.12);
+        }
+      }
+      if (hitPlayer) {
+        if (effects) {
+          triggerDangerFlash(effects);
+        }
+        if (onPlayerHit) {
+          onPlayerHit();
+        }
       }
     } else if (
       next.life > 0 &&
@@ -293,7 +322,7 @@ export function updateProjectiles(projectiles, enemies, structures = [], player,
   return { remaining, hits };
 }
 
-export function checkCrownLoss(enemies, player, state, effects) {
+export function checkCrownLoss(enemies, player, state, effects, onPlayerHit) {
   let playerHit = false;
   enemies.forEach((e) => {
     if (e.hp <= 0) return;
@@ -313,6 +342,9 @@ export function checkCrownLoss(enemies, player, state, effects) {
 
   if (playerHit && effects) {
     triggerDangerFlash(effects);
+  }
+  if (playerHit && onPlayerHit) {
+    onPlayerHit();
   }
   return playerHit;
 }

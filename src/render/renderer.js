@@ -1,4 +1,4 @@
-import { COLORS, ECONOMY, SHRINE_TECH } from '../core/constants.js';
+import { AURA, COLORS, ECONOMY, SHRINE_TECH } from '../core/constants.js';
 import { clamp, hexToRgb, lerpColor } from '../systems/math.js';
 
 function drawRoundedRect(ctx, x, y, w, h, r = 12) {
@@ -65,6 +65,30 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const baseColor = colors.player;
     const accent = shadeColor(baseColor, 0.22);
     const outline = shadeColor(baseColor, -0.28);
+    const auraMax = player.maxAura || AURA.max;
+    const auraRatio = clamp((player.aura ?? auraMax) / auraMax, 0, 1);
+    const auraColor = player.critical ? '#f87171' : baseColor;
+    const auraPulse = player.critical ? 0.2 : 0;
+    const auraRadius = bodyW * 0.9 + 26 * auraRatio;
+    const auraCenterX = bodyX + bodyW / 2;
+    const auraCenterY = bodyY + bodyH / 2;
+
+    ctx.save();
+    const auraRgb = hexToRgb(auraColor);
+    const glow = ctx.createRadialGradient(auraCenterX, auraCenterY, bodyW * 0.3, auraCenterX, auraCenterY, auraRadius);
+    glow.addColorStop(0, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, ${0.22 + auraPulse})`);
+    glow.addColorStop(1, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, 0)`);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = glow;
+    ctx.fillRect(auraCenterX - auraRadius, auraCenterY - auraRadius, auraRadius * 2, auraRadius * 2);
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.lineWidth = player.critical ? 6 : 4;
+    ctx.strokeStyle = `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, ${0.4 + auraPulse})`;
+    ctx.beginPath();
+    ctx.ellipse(auraCenterX, auraCenterY, auraRadius, auraRadius * 0.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
 
     ctx.save();
     ctx.globalAlpha = 0.3;
@@ -573,10 +597,13 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const costIndex = Math.min(nextTier - 1, SHRINE_TECH.costs.length - 1);
     const baseNextCost = SHRINE_TECH.costs[costIndex] ?? unlockCost();
     const nextCost = nextTier === 1 ? Math.max(baseNextCost, ECONOMY.shrineCost) : baseNextCost;
+    const auraMax = player.maxAura || AURA.max;
+    const auraPercent = Math.round(clamp((player.aura ?? auraMax) / auraMax, 0, 1) * 100);
     const hudLines = [
       `Island ${state.islandLevel || 1}: ${islandName}`,
       `Nights: ${state.nightsSurvived}/${world.nightsToWin}`,
       `Gold: ${state.currency}`,
+      `Aura: ${auraPercent}%${player.critical ? ' (critical!)' : ''}`,
     ];
     if (state.island?.bonus?.description) {
       hudLines.push(`Bonus: ${state.island.bonus.description}`);
@@ -725,6 +752,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const items = [
       'Endure 3 nights to ascend to the next sky island.',
       'Keep walls and towers standing to slow the corruption.',
+      'Carry gold and stand within your walls to recover your light aura.',
       shrineHelpCopy(),
       'Income arrives at dawn (+10) and at the start of each night (+5), plus any island bonus.',
       `Daytime: repair walls/towers (Interact) or place barricades with Interact+Down.`,
@@ -766,11 +794,16 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = state.crownLost ? '#f87171' : '#34d399';
+    const lossColor = state.crownLost || state.playerFallen ? '#f87171' : '#34d399';
+    ctx.fillStyle = lossColor;
     ctx.font = '28px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const message = state.crownLost ? 'Crown lost! You were overrun.' : 'Victory! Dawn rises and you endure.';
+    const message = state.crownLost
+      ? 'Crown lost! You were overrun.'
+      : state.playerFallen
+        ? 'You fell into the clouds.'
+        : 'Victory! Dawn rises and you endure.';
     ctx.fillText(message, canvas.width / 2, canvas.height / 2);
     ctx.font = '16px Inter, system-ui, sans-serif';
     ctx.fillStyle = '#e5e7eb';

@@ -1,4 +1,4 @@
-import { BASE_POSITIONS, BASE_WORLD, WORLD_DEFAULTS } from '../core/constants.js';
+import { AURA, BASE_POSITIONS, BASE_WORLD, WORLD_DEFAULTS } from '../core/constants.js';
 
 export function createPlayer(world) {
   const widthRatio = world.width / BASE_WORLD.width;
@@ -24,6 +24,11 @@ export function createPlayer(world) {
     swingDuration: 0.22,
     swingFacing: 1,
     crown: true,
+    aura: AURA.max,
+    maxAura: AURA.max,
+    auraHitCooldown: 0,
+    auraRecoverDelay: 0,
+    critical: false,
   };
 }
 
