@@ -432,9 +432,6 @@ export function createRenderer({ canvas, colors = COLORS }) {
       ctx.stroke();
       if (carried) {
         drawWyvern(e, e.carrier);
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = '11px Inter, system-ui, sans-serif';
-        ctx.fillText('Drop', e.x - 4, e.y - 8);
       }
       ctx.restore();
     });
