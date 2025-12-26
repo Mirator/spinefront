@@ -124,17 +124,21 @@ function updateCarrier(enemy, world, dt) {
 function dropEnemy(enemy, world, dt, rng) {
   const carrier = enemy.carrier;
   if (!carrier || carrier.dropTimer <= 0 || carrier.hasDropped === false) return false;
+
+  const dropDuration = carrier.dropDuration || 0.0001;
   carrier.dropTimer = Math.max(0, carrier.dropTimer - dt);
-  const t = 1 - carrier.dropTimer / (carrier.dropDuration || 0.0001);
+  const dropProgress = 1 - carrier.dropTimer / dropDuration;
   const startY = carrier.height ?? world.ground - enemy.h - 80;
   const targetY = world.ground - enemy.h;
-  enemy.y = startY + (targetY - startY) * Math.min(1, t);
-  if (carrier.dropTimer <= 0) {
-    enemy.y = targetY;
-    if (enemy.vx === 0) {
-      const direction = rng?.boolean?.() ?? Math.random() > 0.5;
-      enemy.vx = enemy.speed * (direction ? 1 : -1);
-    }
+
+  enemy.y = startY + (targetY - startY) * Math.min(1, dropProgress);
+
+  if (carrier.dropTimer > 0) return true;
+
+  enemy.y = targetY;
+  if (enemy.vx === 0) {
+    const direction = rng?.boolean?.() ?? Math.random() > 0.5;
+    enemy.vx = enemy.speed * (direction ? 1 : -1);
   }
   return true;
 }

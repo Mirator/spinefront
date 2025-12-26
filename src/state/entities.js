@@ -1,5 +1,10 @@
 import { AURA, BASE_POSITIONS, BASE_WORLD, WORLD_DEFAULTS } from '../core/constants.js';
 
+const BASE_DROP_OFFSET = 48;
+const DROP_TARGET_MULTIPLIER = 6; // doubled from the previous spacing
+const BASE_DROP_DURATION = 0.35;
+const DROP_SPEED_INCREASE = 1.5;
+
 export function createPlayer(world) {
   const widthRatio = world.width / BASE_WORLD.width;
   const baseX = typeof BASE_POSITIONS.player === 'number' ? BASE_POSITIONS.player : BASE_WORLD.width / 2 - 14;
@@ -89,7 +94,7 @@ export function createEnemy(side, world, structures = [], modifiers = {}, varian
     targetX: dropTarget,
     speedMultiplier: 4 * wyvernScale,
     height: world.ground - 140,
-    dropDuration: 0.35,
+    dropDuration: BASE_DROP_DURATION / DROP_SPEED_INCREASE,
     dropTimer: 0,
   };
   const baseEnemy = {
@@ -143,8 +148,8 @@ function pickDropTarget(side, world, structures = [], dropPadding = 0) {
   const anchor = side === 'left' ? living[0] : living[living.length - 1];
   const anchorCenter = anchor.x + anchor.w / 2;
   const sign = side === 'left' ? -1 : 1;
-  const baseOffset = 48;
-  return anchorCenter + sign * (baseOffset - dropPadding) * 3;
+  const paddedOffset = Math.max(0, BASE_DROP_OFFSET - dropPadding);
+  return anchorCenter + sign * paddedOffset * DROP_TARGET_MULTIPLIER;
 }
 
 export function scalePositions(world, baseWorld = { width: 960 }) {
