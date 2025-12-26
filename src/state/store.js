@@ -1,6 +1,7 @@
 import { BASE_POSITIONS, BASE_WORLD, ECONOMY, WORLD_DEFAULTS, WORLD_SCALE } from '../core/constants.js';
 import { createEffectsState } from '../systems/effects.js';
 import { createInputState, resetInputState } from '../core/input.js';
+import { createRng, normalizeSeed } from '../core/random.js';
 import { clamp } from '../systems/math.js';
 import { createPlayer, createStructureSets, createWall, createTower } from './entities.js';
 import { centerCameraOnPlayer, createCamera, resizeCamera } from './camera.js';
@@ -33,6 +34,8 @@ export function createGameStore(dimensions = {}) {
   const player = createPlayer(world);
   const camera = createCamera(dimensions.width || BASE_WORLD.width, dimensions.height || BASE_WORLD.height, world);
   centerCameraOnPlayer(camera, player, world);
+  const initialSeed = normalizeSeed(dimensions.seed ?? Date.now());
+  const rng = createRng(initialSeed);
   const state = {
     time: 0,
     dayTimer: 0,
@@ -65,6 +68,7 @@ export function createGameStore(dimensions = {}) {
     learnedShrine: island.modifiers?.shrineUnlocked || false,
     pendingAscend: false,
     altitude: 0,
+    randomSeed: rng.seed,
   };
 
   state.shrineUnlocked = state.learnedShrine || false;
@@ -79,6 +83,7 @@ export function createGameStore(dimensions = {}) {
     state,
     input: createInputState(),
     camera,
+    rng,
   };
 }
 
@@ -106,6 +111,18 @@ function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
   state.projectiles = [];
   state.skyBlend = 0;
   state.effects = createEffectsState();
+}
+
+function seedStoreRng(store, seed) {
+  const normalized = normalizeSeed(seed);
+  if (store.state) {
+    store.state.randomSeed = normalized;
+  }
+  if (store.rng) {
+    store.rng.setSeed(normalized);
+  } else {
+    store.rng = createRng(normalized);
+  }
 }
 
 function rebuildStructures(store) {
@@ -139,6 +156,7 @@ function assignIsland(store, level, { keepHistory = false } = {}) {
 export function resetGameStore(store, options = {}) {
   const { keepLearnedUpgrades = false, islandLevel = 1 } = options;
   assignIsland(store, islandLevel, { keepHistory: keepLearnedUpgrades && islandLevel > 1 });
+  seedStoreRng(store, options.seed ?? store.state.randomSeed ?? Date.now());
 
   applyAltitude(store);
   resetRunState(store.state, store.state.modifiers, { keepMenuOpen: false });
@@ -169,6 +187,7 @@ export function resetGameStore(store, options = {}) {
 export function ascendGameStore(store) {
   const nextLevel = (store.state.islandLevel || 1) + 1;
   assignIsland(store, nextLevel, { keepHistory: true });
+  seedStoreRng(store, store.state.randomSeed ?? Date.now());
   applyAltitude(store);
   resetRunState(store.state, store.state.modifiers, { keepMenuOpen: true });
   store.state.pendingAscend = false;
@@ -238,4 +257,9 @@ export function updateWorldDimensions(store, width, height) {
   });
   resizeCamera(store.camera, width, height, store.world);
   centerCameraOnPlayer(store.camera, store.player, store.world);
+}
+
+export function setStoreSeed(store, seed) {
+  seedStoreRng(store, seed);
+  return store.state.randomSeed;
 }

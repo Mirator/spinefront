@@ -1,7 +1,13 @@
 import { COLORS } from './core/constants.js';
 import { resetInputState } from './core/input.js';
 import { bindDomControls } from './input/domControls.js';
-import { ascendGameStore, createGameStore, resetGameStore, updateWorldDimensions } from './state/store.js';
+import {
+  ascendGameStore,
+  createGameStore,
+  resetGameStore,
+  setStoreSeed,
+  updateWorldDimensions,
+} from './state/store.js';
 import { updateCamera } from './state/camera.js';
 import { createEnemy } from './state/entities.js';
 import { createRenderer } from './render/renderer.js';
@@ -32,6 +38,14 @@ if (typeof window !== 'undefined') {
     store,
     renderer,
     snapshot: () => snapshot(),
+    getSeed: () => store.state.randomSeed,
+    setSeed: (seed, { reset = false } = {}) => {
+      const normalized = setStoreSeed(store, seed);
+      if (reset) {
+        resetGame();
+      }
+      return normalized;
+    },
   };
 }
 
@@ -215,7 +229,7 @@ function gameStep(dt) {
     onHit: (enemy) => {
       const centerX = enemy.x + enemy.w / 2;
       const centerY = enemy.y + enemy.h / 2;
-      addHitFlash(store.state.effects, centerX, centerY, store.world.width, store.world.height);
+      addHitFlash(store.state.effects, centerX, centerY, store.world.width, store.world.height, store.rng);
       triggerSlowdown(store.state.effects, 0.18, 0.55);
     },
   };
@@ -231,16 +245,24 @@ function gameStep(dt) {
 
   updatePlayer(store.player, store.world, dt, store.shrine);
   updateCamera(store.camera, store.player, store.world);
-  resolveEnemyAttacks(store.state.enemies, [...store.walls, ...store.towers], store.world, dt);
+  resolveEnemyAttacks(store.state.enemies, [...store.walls, ...store.towers], store.world, dt, store.rng);
   updateTowers(store.towers, store.state.enemies, store.state.projectiles, store.state.shrineUnlocked, dt);
 
-  const projectileResults = updateProjectiles(store.state.projectiles, store.state.enemies, store.world, store.state.effects, dt);
+  const projectileResults = updateProjectiles(
+    store.state.projectiles,
+    store.state.enemies,
+    store.world,
+    store.state.effects,
+    dt,
+    store.rng,
+  );
   store.state.projectiles = projectileResults.remaining;
   updateEnemySpawns(
     store.state,
     store.world,
     (side) => createEnemy(side, store.world, store.towers, store.state.modifiers),
     dt,
+    store.rng,
   );
   checkCrownLoss(store.state.enemies, store.player, store.state, store.state.effects);
   store.state.enemies = cleanupEnemies(store.state.enemies, store.world);
@@ -270,7 +292,7 @@ function loop(now) {
   }
   accumulator += frame;
   while (accumulator >= fixedDelta) {
-    updateEffects(store.state.effects, fixedDelta);
+    updateEffects(store.state.effects, fixedDelta, store.rng);
     const scaledDt = fixedDelta * store.state.effects.timeScale;
     gameStep(scaledDt);
     accumulator -= fixedDelta;

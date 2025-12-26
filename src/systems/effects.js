@@ -9,7 +9,7 @@ export function createEffectsState() {
   };
 }
 
-export function updateEffects(effects, dt) {
+export function updateEffects(effects, dt, rng) {
   effects.hitFlashes = effects.hitFlashes
     .map((flash) => ({ ...flash, timer: flash.timer - dt }))
     .filter((flash) => flash.timer > 0);
@@ -18,8 +18,9 @@ export function updateEffects(effects, dt) {
   if (shake.duration > 0) {
     const falloff = shake.baseDuration > 0 ? shake.duration / shake.baseDuration : 0;
     const magnitude = shake.power * falloff;
-    effects.shakeOffset.x = (Math.random() * 2 - 1) * magnitude;
-    effects.shakeOffset.y = (Math.random() * 2 - 1) * magnitude;
+    const randomOffset = rng?.uniform ? rng.uniform(-1, 1) : Math.random() * 2 - 1;
+    effects.shakeOffset.x = randomOffset * magnitude;
+    effects.shakeOffset.y = (rng?.uniform ? rng.uniform(-1, 1) : Math.random() * 2 - 1) * magnitude;
     shake.duration = Math.max(0, shake.duration - dt);
     shake.power = Math.max(0, shake.power * 0.9);
   } else {
@@ -65,12 +66,12 @@ export function triggerDangerFlash(effects) {
   triggerSlowdown(effects, 0.45, 0.55);
 }
 
-export function addHitFlash(effects, x, y, canvasWidth, canvasHeight) {
+export function addHitFlash(effects, x, y, canvasWidth, canvasHeight, rng) {
   effects.hitFlashes.push({
     x: Math.max(0, Math.min(1, x / canvasWidth)),
     y: Math.max(0, Math.min(1, y / canvasHeight)),
     timer: 0.2,
     duration: 0.2,
-    angle: Math.random() * 50 - 25,
+    angle: (rng?.uniform ? rng.uniform(-25, 25) : Math.random() * 50 - 25),
   });
 }
