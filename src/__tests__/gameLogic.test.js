@@ -42,7 +42,8 @@ describe('game logic systems', () => {
     updateDayNight(state, world, 0);
     expect(state.isNight).toBe(false);
     expect(state.nightsSurvived).toBe(1);
-    expect(checkEndConditions(state, world)).toBe('win');
+    expect(checkEndConditions(state, world)).toBe('ascend');
+    expect(state.pendingAscend).toBe(true);
   });
 
   it('spawns enemies on a night timer', () => {
@@ -56,13 +57,14 @@ describe('game logic systems', () => {
 
   it('applies enemy damage to structures', () => {
     const store = createGameStore();
-    const enemy = createEnemy('left', store.world);
+    const enemy = createEnemy('left', store.world, [], store.state.modifiers);
+    enemy.carrier = null;
     enemy.x = store.walls[0].x;
     enemy.y = store.walls[0].y;
     enemy.attackTimer = 0;
     store.state.enemies.push(enemy);
 
-    const events = resolveEnemyAttacks(store.state.enemies, [store.walls[0]], 1);
+    const events = resolveEnemyAttacks(store.state.enemies, [store.walls[0]], store.world, 1);
     expect(store.walls[0].hp).toBeLessThan(store.walls[0].maxHp);
     expect(events.some((e) => e.type === 'structureHit')).toBe(true);
   });

@@ -1,6 +1,8 @@
 import { COLORS } from '../core/constants.js';
 import { addHitFlash, triggerDangerFlash, triggerScreenShake } from './effects.js';
 
+export const BASE_PROJECTILE_DAMAGE = 18;
+
 export function overlaps(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -102,10 +104,44 @@ export function swingSword(player, enemies, damage = 25, callbacks = {}) {
   return updateSwordCollision(player, enemies, callbacks, damage);
 }
 
-export function resolveEnemyAttacks(enemies, targets, dt) {
+function updateCarrier(enemy, world, dt) {
+  const carrier = enemy.carrier;
+  if (!carrier || !carrier.active || carrier.hasDropped) return false;
+  const dir = Math.sign(carrier.targetX - enemy.x) || (carrier.targetX >= enemy.x ? 1 : -1);
+  enemy.vx = dir * enemy.speed * carrier.speedMultiplier;
+  enemy.x += enemy.vx * dt;
+  const hoverHeight = carrier.height ?? world.ground - enemy.h - 80;
+  enemy.y = Math.min(hoverHeight, world.ground - enemy.h - 20);
+  if (Math.abs(enemy.x - carrier.targetX) < 6) {
+    carrier.hasDropped = true;
+    carrier.dropTimer = carrier.dropDuration;
+    carrier.active = false;
+    enemy.vx = 0;
+  }
+  return true;
+}
+
+function dropEnemy(enemy, world, dt) {
+  const carrier = enemy.carrier;
+  if (!carrier || carrier.dropTimer <= 0 || carrier.hasDropped === false) return false;
+  carrier.dropTimer = Math.max(0, carrier.dropTimer - dt);
+  const t = 1 - carrier.dropTimer / (carrier.dropDuration || 0.0001);
+  const startY = carrier.height ?? world.ground - enemy.h - 80;
+  const targetY = world.ground - enemy.h;
+  enemy.y = startY + (targetY - startY) * Math.min(1, t);
+  if (carrier.dropTimer <= 0) {
+    enemy.y = targetY;
+    enemy.vx = enemy.vx === 0 ? enemy.speed * (Math.random() > 0.5 ? 1 : -1) : enemy.vx;
+  }
+  return true;
+}
+
+export function resolveEnemyAttacks(enemies, targets, world, dt) {
   const events = [];
   enemies.forEach((e) => {
     if (e.hp <= 0) return;
+    if (updateCarrier(e, world, dt)) return;
+    if (dropEnemy(e, world, dt)) return;
     if (e.stunTimer > 0) {
       e.stunTimer = Math.max(0, e.stunTimer - dt);
       e.x += e.vx * dt;
@@ -146,13 +182,14 @@ export function spawnTowerProjectile(tower, target) {
   const speed = 520;
   const vx = (dx / distance) * speed;
   const vy = (dy / distance) * speed;
+  const damageScale = Math.max(0.6, tower.damageMultiplier || 1);
   return {
     x: muzzleX,
     y: muzzleY,
     vx,
     vy,
     radius: 4,
-    damage: 18,
+    damage: Math.round(BASE_PROJECTILE_DAMAGE * damageScale),
     life: Math.min(1.2, distance / speed + 0.35),
     color: COLORS.tower,
   };

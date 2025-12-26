@@ -287,12 +287,44 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
+  function drawWyvern(enemy, carrier) {
+    const wyvernX = enemy.x + enemy.w / 2;
+    const wyvernY = (carrier?.height ?? enemy.y - 40) - 14;
+    ctx.save();
+    ctx.fillStyle = colors.wyvern;
+    ctx.strokeStyle = shadeColor(colors.wyvern, -0.2);
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(wyvernX - 22, wyvernY);
+    ctx.quadraticCurveTo(wyvernX - 10, wyvernY - 18, wyvernX, wyvernY - 4);
+    ctx.quadraticCurveTo(wyvernX + 10, wyvernY - 18, wyvernX + 22, wyvernY);
+    ctx.quadraticCurveTo(wyvernX + 8, wyvernY + 6, wyvernX, wyvernY + 2);
+    ctx.quadraticCurveTo(wyvernX - 8, wyvernY + 6, wyvernX - 22, wyvernY);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = shadeColor(colors.wyvern, 0.25);
+    ctx.beginPath();
+    ctx.ellipse(wyvernX, wyvernY + 8, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(wyvernX, wyvernY + 10);
+    ctx.lineTo(enemy.x + enemy.w / 2, enemy.y + 6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawEnemies(enemies) {
     enemies.forEach((e) => {
       if (e.hp <= 0) return;
       const baseColor = colors.enemy;
       const shadow = shadeColor(baseColor, -0.25);
       const highlight = shadeColor(baseColor, 0.2);
+      const carried = e.carrier && (!e.carrier.hasDropped || e.carrier.dropTimer > 0);
       ctx.save();
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -336,6 +368,12 @@ export function createRenderer({ canvas, colors = COLORS }) {
       ctx.moveTo(e.x + e.w / 2 - 8, e.y + e.h * 0.48);
       ctx.lineTo(e.x + e.w / 2 + 8, e.y + e.h * 0.48);
       ctx.stroke();
+      if (carried) {
+        drawWyvern(e, e.carrier);
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = '11px Inter, system-ui, sans-serif';
+        ctx.fillText('Drop', e.x - 4, e.y - 8);
+      }
       ctx.restore();
     });
   }
@@ -443,23 +481,31 @@ export function createRenderer({ canvas, colors = COLORS }) {
   function drawHUD(snapshot) {
     const { state, world, player, shrine } = snapshot;
     const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
+    const islandName = state.island?.bonus?.name || 'Skybound Outpost';
     const hudLines = [
+      `Island ${state.islandLevel || 1}: ${islandName}`,
       `Nights: ${state.nightsSurvived}/${world.nightsToWin}`,
       `Gold: ${state.currency}`,
     ];
+    if (state.island?.bonus?.description) {
+      hudLines.push(`Bonus: ${state.island.bonus.description}`);
+    }
     const shrineLine = state.shrineUnlocked
       ? 'Shrine: Unlocked — towers fire faster'
       : nearShrine
         ? `E: Unlock shrine (${shrineCostText()})${state.currency < ECONOMY.shrineCost ? ' — need gold' : ''}`
         : 'Shrine: Locked (approach to unlock)';
     hudLines.push(shrineLine);
+    if (state.pendingAscend) {
+      hudLines.push('Ascend ready: open the menu to climb.');
+    }
     if (state.hudText) {
       hudLines.push(state.hudText);
     }
 
     ctx.save();
     const padding = 12;
-    const maxWidth = 280;
+    const maxWidth = 340;
     const lineHeight = 18;
     const blockHeight = padding * 2 + hudLines.length * lineHeight;
     const x = canvas.width - maxWidth - 12;
@@ -561,15 +607,25 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const message = state.menuMessage || 'Survive 3 nights, defend the crown, and unlock the shrine.';
     ctx.fillText(message, panelX + 18, panelY + 64);
 
+    if (state.island?.bonus?.name) {
+      ctx.fillStyle = '#a5f3fc';
+      ctx.font = '13px Inter, system-ui, sans-serif';
+      ctx.fillText(
+        `Island bonus: ${state.island.bonus.name} — ${state.island.bonus.description || ''}`,
+        panelX + 18,
+        panelY + 84,
+      );
+    }
+
     ctx.font = '13px Inter, system-ui, sans-serif';
     const items = [
-      'Win by surviving 3 nights.',
-      'Keep walls and towers standing to slow the horde.',
+      'Endure 3 nights to ascend to the next sky island.',
+      'Keep walls and towers standing to slow the corruption.',
       shrineHelpCopy(),
-      'Income arrives at dawn (+10) and at the start of each night (+5).',
+      'Income arrives at dawn (+10) and at the start of each night (+5), plus any island bonus.',
     ];
     items.forEach((line, idx) => {
-      ctx.fillText(`• ${line}`, panelX + 18, panelY + 96 + idx * 18);
+      ctx.fillText(`• ${line}`, panelX + 18, panelY + 110 + idx * 18);
     });
 
     const startLabel = state.menuStartLabel || 'Start run';
@@ -620,8 +676,9 @@ export function createRenderer({ canvas, colors = COLORS }) {
 
   function drawBackground(state, world, camera) {
     ctx.clearRect(-state.effects.shakeOffset.x, -state.effects.shakeOffset.y, canvas.width, canvas.height);
-    const skyTop = lerpColor('#78bef5', '#0c1324', state.skyBlend);
-    const skyBottom = lerpColor('#1e3a8a', '#0f172a', state.skyBlend);
+    const altitudeBlend = clamp((state.islandLevel - 1) * 0.12, 0, 1);
+    const skyTop = lerpColor('#c7e9ff', '#0c1324', state.skyBlend * 0.7 + altitudeBlend * 0.3);
+    const skyBottom = lerpColor('#6bb7ff', '#0f1c3c', state.skyBlend * 0.7 + altitudeBlend * 0.3);
     const gradient = ctx.createLinearGradient(0, 0, 0, camera.h);
     gradient.addColorStop(0, skyTop);
     gradient.addColorStop(1, skyBottom);
@@ -640,10 +697,63 @@ export function createRenderer({ canvas, colors = COLORS }) {
     drawCelestials(state, world, camera);
 
     const groundY = world.ground - camera.y;
-    ctx.fillStyle = lerpColor('#115e38', '#0b3323', state.skyBlend);
-    ctx.fillRect(0, groundY, camera.w, camera.h - groundY);
-    ctx.fillStyle = lerpColor('#1d7048', '#124030', state.skyBlend);
-    ctx.fillRect(0, groundY + 26, camera.w, 16);
+    const islandTop = lerpColor(colors.islandTop, shadeColor(colors.islandTop, -0.15), state.skyBlend * 0.5);
+    const islandShadow = lerpColor(colors.islandShadow, '#0b3323', state.skyBlend * 0.8);
+
+    const drawCloud = (x, y, scale = 1, alpha = 0.4) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.ellipse(x, y, 40 * scale, 18 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 26 * scale, y + 8 * scale, 32 * scale, 14 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(x - 26 * scale, y + 6 * scale, 26 * scale, 12 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const cloudSeed = state.islandLevel || 1;
+    drawCloud((cloudSeed * 57) % camera.w, 90 + (cloudSeed % 4) * 14, 1, 0.45);
+    drawCloud((cloudSeed * 31 + 140) % camera.w, 140, 0.8, 0.35);
+    drawCloud((cloudSeed * 73 + 260) % camera.w, 200, 1.15, 0.5);
+
+    ctx.save();
+    const topGradient = ctx.createLinearGradient(0, groundY - 60, 0, groundY + 90);
+    topGradient.addColorStop(0, shadeColor(islandTop, 0.18));
+    topGradient.addColorStop(1, islandTop);
+    ctx.fillStyle = topGradient;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(camera.w, groundY);
+    ctx.lineTo(camera.w - 80, groundY + 46);
+    ctx.lineTo(camera.w - 140, groundY + 86);
+    ctx.lineTo(120, groundY + 86);
+    ctx.lineTo(52, groundY + 46);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = islandShadow;
+    ctx.beginPath();
+    ctx.moveTo(camera.w - 140, groundY + 86);
+    ctx.lineTo(camera.w - 200, groundY + 124);
+    ctx.lineTo(camera.w - 260, groundY + 150);
+    ctx.lineTo(140, groundY + 150);
+    ctx.lineTo(90, groundY + 110);
+    ctx.lineTo(120, groundY + 86);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = shadeColor(islandShadow, -0.05);
+    ctx.beginPath();
+    ctx.moveTo(camera.w * 0.42, groundY + 86);
+    ctx.lineTo(camera.w * 0.46, groundY + 128);
+    ctx.lineTo(camera.w * 0.5, groundY + 104);
+    ctx.lineTo(camera.w * 0.54, groundY + 138);
+    ctx.lineTo(camera.w * 0.58, groundY + 98);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 
   function draw(snapshot) {

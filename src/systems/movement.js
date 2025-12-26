@@ -37,6 +37,7 @@ export function applyInputToPlayer(player, input, state, shrine, towers) {
   if (input.interact && nearShrine && !state.shrineUnlocked && state.currency >= ECONOMY.shrineCost) {
     state.currency -= ECONOMY.shrineCost;
     state.shrineUnlocked = true;
+    state.learnedShrine = true;
     state.hudText = 'Shrine tech unlocked! Towers shoot faster.';
   }
 
