@@ -44,6 +44,7 @@ export function createWall(x, world, modifiers = {}) {
 export function createTower(x, world, modifiers = {}) {
   const fireRateScale = modifiers.towerFireRate || 1;
   const damageScale = modifiers.projectileDamage || 1;
+  const damageMultiplier = damageScale;
   return {
     type: 'tower',
     x,
@@ -54,7 +55,8 @@ export function createTower(x, world, modifiers = {}) {
     maxHp: 160,
     fireRate: 1.4 * fireRateScale,
     fireTimer: 0,
-    damageMultiplier: damageScale,
+    damageMultiplier,
+    baseDamageMultiplier: damageMultiplier,
   };
 }
 
@@ -85,7 +87,7 @@ export function createEnemy(side, world, towers = [], modifiers = {}, variant = 
     dropDuration: 0.35,
     dropTimer: 0,
   };
-  return {
+  const baseEnemy = {
     type: 'enemy',
     variant,
     spawnSide: side,
@@ -104,6 +106,29 @@ export function createEnemy(side, world, towers = [], modifiers = {}, variant = 
     maxHp: Math.round(50 * hpScale),
     carrier,
   };
+
+  if (variant === 'sapper') {
+    return {
+      ...baseEnemy,
+      w: 26,
+      h: 32,
+      speed: 48 * speedScale,
+      vx: side === 'left' ? 48 * speedScale : -48 * speedScale,
+      attack: 10,
+      attackRate: 0.8,
+      hp: Math.round(60 * hpScale),
+      maxHp: Math.round(60 * hpScale),
+      carrier,
+      ranged: {
+        range: 260,
+        preferredRange: 200,
+        projectileSpeed: 320,
+        projectileDamage: 14,
+      },
+    };
+  }
+
+  return baseEnemy;
 }
 
 function pickDropTarget(side, world, towers = [], dropPadding = 0) {
@@ -139,4 +164,18 @@ export function createStructureSets(world, baseWorld, modifiers = {}) {
 
 export function cloneEntity(entity) {
   return JSON.parse(JSON.stringify(entity));
+}
+
+export function createBarricade(x, world) {
+  const clampedX = Math.max(40, Math.min(world.width - 60, x));
+  return {
+    type: 'barricade',
+    x: clampedX - 18,
+    y: world.ground - 28,
+    w: 36,
+    h: 28,
+    hp: 70,
+    maxHp: 70,
+    temporary: true,
+  };
 }

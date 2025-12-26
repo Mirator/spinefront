@@ -27,6 +27,8 @@ export function updateDayNight(state, world, dt) {
       state.waveTimer = 0;
       state.waveInterval = 0;
       state.waveDefinition = null;
+      state.waveDescriptors = [];
+      state.enemyProjectiles = [];
       state.hudText = `Sunrise! You earned income.`;
       events.becameDay = true;
     }

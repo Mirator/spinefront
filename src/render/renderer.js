@@ -1,4 +1,4 @@
-import { COLORS, ECONOMY } from '../core/constants.js';
+import { COLORS, ECONOMY, SHRINE_TECH } from '../core/constants.js';
 import { clamp, hexToRgb, lerpColor } from '../systems/math.js';
 
 function drawRoundedRect(ctx, x, y, w, h, r = 12) {
@@ -26,8 +26,19 @@ function shadeColor(hex, factor) {
   return `rgb(${adjust(r)}, ${adjust(g)}, ${adjust(b)})`;
 }
 
-const shrineCostText = () => `${ECONOMY.shrineCost} gold`;
-const shrineHelpCopy = () => `Unlock shrine tech for ${shrineCostText()} to speed up tower fire rate.`;
+function branchLabel(branchId) {
+  return SHRINE_TECH.branches[branchId]?.label || 'Unknown';
+}
+
+function shrineTierSummary(s) {
+  const cadence = s.branches?.cadence || 0;
+  const power = s.branches?.power || 0;
+  return `Cadence ${cadence}/${SHRINE_TECH.costs.length} | Power ${power}/${SHRINE_TECH.costs.length}`;
+}
+
+const unlockCost = () => Math.max(SHRINE_TECH.costs[0] ?? ECONOMY.shrineCost, ECONOMY.shrineCost);
+const shrineCostText = () => `${unlockCost()} gold`;
+const shrineHelpCopy = () => `Unlock shrine tech for ${shrineCostText()} to pick a tech branch.`;
 
 export function createRenderer({ canvas, colors = COLORS }) {
   const ctx = canvas.getContext('2d');
@@ -200,6 +211,23 @@ export function createRenderer({ canvas, colors = COLORS }) {
     drawHpBar(wall);
   }
 
+  function drawBarricade(barricade) {
+    const baseColor = barricade.hp > 0 ? colors.barricade : '#92400e';
+    const highlight = shadeColor(baseColor, 0.25);
+    const shadow = shadeColor(baseColor, -0.28);
+    ctx.save();
+    ctx.fillStyle = baseColor;
+    ctx.strokeStyle = shadow;
+    ctx.lineWidth = 2;
+    drawRoundedRect(ctx, barricade.x, barricade.y, barricade.w, barricade.h, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = highlight;
+    ctx.fillRect(barricade.x + 4, barricade.y + 6, barricade.w - 8, 6);
+    ctx.restore();
+    drawHpBar(barricade);
+  }
+
   function drawTower(tower) {
     const baseColor = tower.hp > 0 ? colors.tower : '#1f2937';
     const highlight = shadeColor(baseColor, 0.2);
@@ -253,9 +281,10 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
-  function drawStructures(walls, towers) {
+  function drawStructures(walls, towers, barricades = []) {
     walls.forEach(drawWall);
     towers.forEach(drawTower);
+    barricades.forEach(drawBarricade);
   }
 
   function drawShrine(shrine, shrineUnlocked) {
@@ -321,7 +350,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
   function drawEnemies(enemies) {
     enemies.forEach((e) => {
       if (e.hp <= 0) return;
-      const baseColor = colors.enemy;
+      const baseColor = e.variant === 'sapper' ? colors.sapper : colors.enemy;
       const shadow = shadeColor(baseColor, -0.25);
       const highlight = shadeColor(baseColor, 0.2);
       const carried = e.carrier && (!e.carrier.hasDropped || e.carrier.dropTimer > 0);
@@ -362,6 +391,15 @@ export function createRenderer({ canvas, colors = COLORS }) {
       ctx.arc(e.x + e.w / 2, e.y + e.h * 0.35, 6, 0, Math.PI * 2);
       ctx.fill();
 
+      if (e.variant === 'sapper') {
+        ctx.fillStyle = shadeColor(baseColor, -0.35);
+        ctx.fillRect(e.x + e.w * 0.28, e.y + e.h * 0.48, e.w * 0.44, 5);
+        ctx.fillStyle = '#fef3c7';
+        ctx.beginPath();
+        ctx.arc(e.x + e.w * 0.7, e.y + e.h * 0.52, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -399,6 +437,35 @@ export function createRenderer({ canvas, colors = COLORS }) {
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.fill();
     });
+    ctx.restore();
+  }
+
+  function drawDroppedCrown(drop) {
+    if (!drop?.active) return;
+    ctx.save();
+    const base = colors.crown;
+    ctx.fillStyle = shadeColor(base, -0.1);
+    const x = drop.x;
+    const y = drop.y;
+    drawRoundedRect(ctx, x - 12, y - 6, 24, 10, 3);
+    ctx.fill();
+    ctx.fillStyle = base;
+    ctx.beginPath();
+    ctx.moveTo(x - 12, y - 2);
+    ctx.lineTo(x - 6, y - 12);
+    ctx.lineTo(x, y - 2);
+    ctx.lineTo(x + 6, y - 12);
+    ctx.lineTo(x + 12, y - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(x, y - 4, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fef3c7';
+    ctx.font = '10px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${drop.timer.toFixed(1)}s`, x, y + 14);
     ctx.restore();
   }
 
@@ -461,6 +528,24 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
+  function drawEdgeWarnings(effects, camera) {
+    if (!effects.warnings?.length) return;
+    ctx.save();
+    effects.warnings.forEach((warning) => {
+      const alpha = clamp(warning.timer / warning.duration, 0, 1);
+      const x = warning.side === 'left' ? 24 : camera.w - 24;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = colors.beacon;
+      ctx.beginPath();
+      ctx.moveTo(x, 20);
+      ctx.lineTo(x + (warning.side === 'left' ? 18 : -18), 44);
+      ctx.lineTo(x, 68);
+      ctx.closePath();
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
   function drawVignette(effects) {
     if (effects.vignette.timer <= 0) return;
     const strength = (effects.vignette.timer / effects.vignette.duration) * effects.vignette.intensity;
@@ -482,6 +567,12 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const { state, world, player, shrine } = snapshot;
     const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
     const islandName = state.island?.bonus?.name || 'Skybound Outpost';
+    const shrineTech = state.shrineTech || { branches: { cadence: 0, power: 0 } };
+    const selection = shrineTech.selection || 'cadence';
+    const nextTier = (shrineTech.branches?.[selection] || 0) + 1;
+    const costIndex = Math.min(nextTier - 1, SHRINE_TECH.costs.length - 1);
+    const baseNextCost = SHRINE_TECH.costs[costIndex] ?? unlockCost();
+    const nextCost = nextTier === 1 ? Math.max(baseNextCost, ECONOMY.shrineCost) : baseNextCost;
     const hudLines = [
       `Island ${state.islandLevel || 1}: ${islandName}`,
       `Nights: ${state.nightsSurvived}/${world.nightsToWin}`,
@@ -491,11 +582,24 @@ export function createRenderer({ canvas, colors = COLORS }) {
       hudLines.push(`Bonus: ${state.island.bonus.description}`);
     }
     const shrineLine = state.shrineUnlocked
-      ? 'Shrine: Unlocked — towers fire faster'
+      ? `Shrine: ${branchLabel(selection)} — ${shrineTierSummary(shrineTech)}`
       : nearShrine
-        ? `E: Unlock shrine (${shrineCostText()})${state.currency < ECONOMY.shrineCost ? ' — need gold' : ''}`
+        ? `E: Unlock shrine (${nextCost} gold) — focus ${branchLabel(selection)} (up/down to switch)${state.currency < nextCost ? ' — need gold' : ''}`
         : 'Shrine: Locked (approach to unlock)';
     hudLines.push(shrineLine);
+    if (!state.isNight) {
+      hudLines.push(`Day build: Repair (-${ECONOMY.repairCost}) near walls/towers or E+↓ for barricade (-${ECONOMY.barricadeCost}).`);
+    }
+    if (state.droppedCrown?.active) {
+      hudLines.push(`Crown dropped! ${state.droppedCrown.timer.toFixed(1)}s to recover.`);
+    }
+    if (state.isNight && state.waveDescriptors?.length) {
+      const preview = state.waveDescriptors.slice(0, 3);
+      const summary = preview
+        .map((d) => `${d.side === 'left' ? 'L' : 'R'}-${d.enemyType}${d.burst ? '!' : ''}`)
+        .join(' | ');
+      hudLines.push(`Next wave: ${summary}`);
+    }
     if (state.pendingAscend) {
       hudLines.push('Ascend ready: open the menu to climb.');
     }
@@ -531,7 +635,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = 'rgba(229, 231, 235, 0.9)';
     const text =
-      'Move: A/D or ←/→ | Jump: Space | Ladder: W/S or ↑/↓ | Sprint: Shift | Attack: F | Interact: E | Restart: R | Menu: Esc';
+      'Move: A/D or ←/→ | Jump: Space | Ladder: W/S or ↑/↓ | Sprint: Shift | Attack: F | Interact/Build: E (E+↓ for barricade) | Restart: R | Menu: Esc';
     ctx.fillText(text, canvas.width / 2, canvas.height - 12);
     ctx.restore();
   }
@@ -623,6 +727,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
       'Keep walls and towers standing to slow the corruption.',
       shrineHelpCopy(),
       'Income arrives at dawn (+10) and at the start of each night (+5), plus any island bonus.',
+      `Daytime: repair walls/towers (Interact) or place barricades with Interact+Down.`,
     ];
     items.forEach((line, idx) => {
       ctx.fillText(`• ${line}`, panelX + 18, panelY + 110 + idx * 18);
@@ -757,7 +862,19 @@ export function createRenderer({ canvas, colors = COLORS }) {
   }
 
   function draw(snapshot) {
-    const { world, state, camera, player, shrine, walls, towers, enemies, projectiles } = snapshot;
+    const {
+      world,
+      state,
+      camera,
+      player,
+      shrine,
+      walls,
+      towers,
+      barricades = [],
+      enemies,
+      projectiles,
+      enemyProjectiles = [],
+    } = snapshot;
     const activeCamera = camera || { x: 0, y: 0, w: canvas.width, h: canvas.height };
 
     // World layer (shaken)
@@ -768,9 +885,11 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.save();
     ctx.translate(-activeCamera.x, -activeCamera.y);
     drawShrine(shrine, state.shrineUnlocked);
-    drawStructures(walls, towers);
+    drawStructures(walls, towers, barricades);
     drawEnemies(enemies);
     drawProjectiles(projectiles);
+    drawProjectiles(enemyProjectiles);
+    drawDroppedCrown(state.droppedCrown);
     drawPlayer(player);
     drawPlayerAttack(player);
     drawHitFlashes(state.effects, world);
@@ -780,6 +899,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
 
     // UI layer (stable)
+    drawEdgeWarnings(state.effects, activeCamera);
     drawHUD(snapshot);
     drawMenuToggle(state);
     const touchControlsActive = isTouchViewport();
