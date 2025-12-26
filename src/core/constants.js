@@ -11,7 +11,7 @@ export const WORLD_SCALE = {
 
 export const WORLD_DEFAULTS = {
   gravity: 1800,
-  dayLength: 30,
+  dayLength: 60,
   nightsToWin: 3,
 };
 
