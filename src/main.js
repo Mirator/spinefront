@@ -1,46 +1,25 @@
 import { COLORS } from './core/constants.js';
-import { resetInputState } from './core/input.js';
+import { GameSession } from './core/session.js';
 import { bindDomControls } from './input/domControls.js';
-import {
-  ascendGameStore,
-  createGameStore,
-  resetGameStore,
-  setStoreSeed,
-  updateWorldDimensions,
-} from './state/store.js';
-import { updateCamera } from './state/camera.js';
-import { createEnemy } from './state/entities.js';
 import { createRenderer } from './render/renderer.js';
-import { addHitFlash, triggerSlowdown, updateEffects } from './systems/effects.js';
-import { applyInputToPlayer, updatePlayer } from './systems/movement.js';
-import {
-  checkCrownLoss,
-  cleanupEnemies,
-  resolveEnemyAttacks,
-  swingSword,
-  updateSwordCollision,
-  updateProjectiles,
-  updateTowers,
-} from './systems/combat.js';
-import { updateDayNight, checkEndConditions } from './systems/cycle.js';
-import { updateEnemySpawns } from './systems/spawning.js';
 
 const canvas = document.getElementById('game');
 const fullscreenButton = document.getElementById('fullscreen-toggle');
 const mobileControls = document.querySelector('.mobile-controls');
 
-const store = createGameStore({ width: canvas.width, height: canvas.height });
+const session = new GameSession({ width: canvas.width, height: canvas.height });
 
 const renderer = createRenderer({ canvas, colors: COLORS, onReset: () => resetGame() });
 
 if (typeof window !== 'undefined') {
   window.__spinefront = {
-    store,
+    session,
+    store: session.store,
     renderer,
-    snapshot: () => snapshot(),
-    getSeed: () => store.state.randomSeed,
+    snapshot: () => session.getSnapshot(),
+    getSeed: () => session.getState().randomSeed,
     setSeed: (seed, { reset = false } = {}) => {
-      const normalized = setStoreSeed(store, seed);
+      const normalized = session.setSeed(seed);
       if (reset) {
         resetGame();
       }
@@ -51,87 +30,51 @@ if (typeof window !== 'undefined') {
 
 function syncMenuUiState() {
   if (!mobileControls) return;
-  mobileControls.dataset.menuOpen = store.state.menuOpen ? 'true' : 'false';
-  mobileControls.classList.toggle('is-menu-open', store.state.menuOpen);
+  const state = session.getState();
+  mobileControls.dataset.menuOpen = state.menuOpen ? 'true' : 'false';
+  mobileControls.classList.toggle('is-menu-open', state.menuOpen);
 }
 
 function resetGame() {
-  resetGameStore(store);
-  store.state.menuOpen = false;
-  store.state.paused = false;
+  session.reset();
   syncMenuUiState();
   window.dispatchEvent(new CustomEvent('spinefront:reset'));
-  renderer.render(snapshot());
+  renderer.render(session.getSnapshot());
 }
 
 function updateMenu(reason = 'paused') {
-  const islandLine =
-    store.state.island?.bonus?.name && store.state.island?.bonus?.description
-      ? `${store.state.island.bonus.name}: ${store.state.island.bonus.description}`
-      : 'Hold the line on this island, then ascend.';
-  let headline = 'Run paused';
-  let detail = islandLine;
-  if (reason === 'intro') {
-    headline = 'Ready to deploy';
-  } else if (reason === 'ended') {
-    headline = 'Run complete';
-    detail = 'Defeat or victory, regroup and launch a fresh climb.';
-  } else if (reason === 'ascend') {
-    headline = `Island ${store.state.islandLevel} cleared`;
-    detail = 'Climb to the next sky island with what you have learned.';
-  }
-  const startLabel = store.state.pendingAscend
-    ? 'Ascend'
-    : store.state.ended || !store.state.hasStarted
-      ? 'Start run'
-      : reason === 'paused'
-        ? 'Resume run'
-        : 'Start run';
-  store.state.menuStatus = headline;
-  store.state.menuMessage = detail;
-  store.state.menuStartLabel = startLabel;
+  session.updateMenu(reason);
 }
 
 function openMenu(reason = 'paused') {
-  store.state.menuOpen = true;
-  store.state.paused = true;
-  resetInputState(store.input);
+  session.openMenu(reason);
   syncMenuUiState();
   updateMenu(reason);
 }
 
 function closeMenu() {
-  store.state.menuOpen = false;
-  store.state.paused = false;
-  store.state.hasStarted = true;
+  session.closeMenu();
   syncMenuUiState();
   updateMenu();
 }
 
 function startFromMenu(reset = false) {
-  if (reset || store.state.ended || (!store.state.hasStarted && !store.state.pendingAscend)) {
-    resetGame();
-  } else if (store.state.pendingAscend) {
-    ascendGameStore(store);
-    store.state.pendingAscend = false;
-  }
-  closeMenu();
+  session.startFromMenu({ reset });
+  syncMenuUiState();
+  renderer.render(session.getSnapshot());
 }
 
 function toggleMenu(reason = 'paused') {
-  if (store.state.menuOpen) {
-    closeMenu();
-  } else {
-    const nextReason = store.state.ended ? 'ended' : reason;
-    openMenu(nextReason);
-  }
+  session.toggleMenu(reason);
+  syncMenuUiState();
+  renderer.render(session.getSnapshot());
 }
 
 const controlsCleanup = bindDomControls({
-  input: store.input,
-  isEnded: () => store.state.ended,
+  applyInput: (update) => session.applyInput(update),
+  isEnded: () => session.getState().ended,
   onReset: () => resetGame(),
-  isMenuOpen: () => store.state.menuOpen,
+  isMenuOpen: () => session.getState().menuOpen,
   onStart: () => startFromMenu(),
   onToggleMenu: () => toggleMenu('paused'),
 });
@@ -201,80 +144,7 @@ function resizeCanvas() {
     canvas.height = targetHeight;
   }
 
-  updateWorldDimensions(store, canvas.width, canvas.height);
-}
-
-function snapshot() {
-  return {
-    world: store.world,
-    camera: store.camera,
-    state: store.state,
-    player: store.player,
-    shrine: store.shrine,
-    walls: store.walls,
-    towers: store.towers,
-    enemies: store.state.enemies,
-    projectiles: store.state.projectiles,
-  };
-}
-
-function gameStep(dt) {
-  if (store.state.menuOpen || store.state.paused) return renderer.render(snapshot());
-  if (store.state.ended) {
-    store.state.paused = true;
-    return renderer.render(snapshot());
-  }
-
-  const swordCallbacks = {
-    onHit: (enemy) => {
-      const centerX = enemy.x + enemy.w / 2;
-      const centerY = enemy.y + enemy.h / 2;
-      addHitFlash(store.state.effects, centerX, centerY, store.world.width, store.world.height, store.rng);
-      triggerSlowdown(store.state.effects, 0.18, 0.55);
-    },
-  };
-
-  const swung = applyInputToPlayer(store.player, store.input, store.state, store.shrine, store.towers);
-  if (swung) {
-    swingSword(store.player, store.state.enemies, 25, swordCallbacks);
-  }
-
-  if (store.player.swingTimer > 0) {
-    updateSwordCollision(store.player, store.state.enemies, swordCallbacks);
-  }
-
-  updatePlayer(store.player, store.world, dt, store.shrine);
-  updateCamera(store.camera, store.player, store.world);
-  resolveEnemyAttacks(store.state.enemies, [...store.walls, ...store.towers], store.world, dt, store.rng);
-  updateTowers(store.towers, store.state.enemies, store.state.projectiles, store.state.shrineUnlocked, dt);
-
-  const projectileResults = updateProjectiles(
-    store.state.projectiles,
-    store.state.enemies,
-    store.world,
-    store.state.effects,
-    dt,
-    store.rng,
-  );
-  store.state.projectiles = projectileResults.remaining;
-  updateEnemySpawns(
-    store.state,
-    store.world,
-    (side) => createEnemy(side, store.world, store.towers, store.state.modifiers),
-    dt,
-    store.rng,
-  );
-  checkCrownLoss(store.state.enemies, store.player, store.state, store.state.effects);
-  store.state.enemies = cleanupEnemies(store.state.enemies, store.world);
-  updateDayNight(store.state, store.world, dt);
-  const outcome = checkEndConditions(store.state, store.world);
-  if (outcome === 'loss' && !store.state.menuOpen) {
-    openMenu('ended');
-  } else if (outcome === 'ascend' && !store.state.menuOpen) {
-    store.state.hudText = `Island ${store.state.islandLevel} cleared. Ascend when ready.`;
-    openMenu('ascend');
-  }
-  renderer.render(snapshot());
+  session.resize(canvas.width, canvas.height);
 }
 
 let accumulator = 0;
@@ -284,20 +154,19 @@ let last = performance.now();
 function loop(now) {
   const frame = Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (store.state.menuOpen || store.state.paused) {
+  const state = session.getState();
+  if (state.menuOpen || state.paused) {
     accumulator = 0;
-    renderer.render(snapshot());
+    renderer.render(session.getSnapshot());
     requestAnimationFrame(loop);
     return;
   }
   accumulator += frame;
   while (accumulator >= fixedDelta) {
-    updateEffects(store.state.effects, fixedDelta, store.rng);
-    const scaledDt = fixedDelta * store.state.effects.timeScale;
-    gameStep(scaledDt);
+    session.step(fixedDelta);
     accumulator -= fixedDelta;
-    store.state.time += scaledDt;
   }
+  renderer.render(session.getSnapshot());
   requestAnimationFrame(loop);
 }
 
@@ -313,7 +182,7 @@ document.addEventListener('webkitfullscreenchange', () => {
 resizeCanvas();
 refreshFullscreenButton();
 
-renderer.render(snapshot());
+renderer.render(session.getSnapshot());
 openMenu('intro');
 updateMenu('intro');
 
@@ -335,7 +204,7 @@ function handlePointer(event) {
   const y = (event.clientY - rect.top) * scaleY;
   const regions = renderer.getInteractiveRegions();
 
-  if (store.state.menuOpen && pointInRect(x, y, regions.menuStart)) {
+  if (session.getState().menuOpen && pointInRect(x, y, regions.menuStart)) {
     event.preventDefault();
     startFromMenu();
     return;
