@@ -75,14 +75,14 @@ export function createShrine(world) {
   };
 }
 
-export function createEnemy(side, world, towers = [], modifiers = {}, variant = 'enemy') {
+export function createEnemy(side, world, structures = [], modifiers = {}, variant = 'enemy') {
   const spawnPadding = 120;
   const x = side === 'left' ? -spawnPadding : world.width + spawnPadding;
   const speedScale = modifiers.enemySpeed || 1;
   const hpScale = modifiers.enemyHp || 1;
   const wyvernScale = modifiers.wyvernSpeed || 1;
   const baseSpeed = 65 * speedScale;
-  const dropTarget = pickDropTarget(side, world, towers, modifiers.dropPadding || 0);
+  const dropTarget = pickDropTarget(side, world, structures, modifiers.dropPadding || 0);
   const carrier = {
     active: true,
     hasDropped: false,
@@ -136,18 +136,15 @@ export function createEnemy(side, world, towers = [], modifiers = {}, variant = 
   return baseEnemy;
 }
 
-function pickDropTarget(side, world, towers = [], dropPadding = 0) {
-  const living = towers.filter((t) => t.hp > 0);
+function pickDropTarget(side, world, structures = [], dropPadding = 0) {
+  const living = structures.filter((structure) => structure.hp > 0).sort((a, b) => a.x - b.x);
   const fallback = side === 'left' ? world.width * 0.35 : world.width * 0.65;
   if (!living.length) return fallback;
-  const preferred = living.reduce((closest, tower) => {
-    if (!closest) return tower;
-    const center = tower.x + tower.w / 2;
-    const bestCenter = closest.x + closest.w / 2;
-    return Math.abs(center - fallback) < Math.abs(bestCenter - fallback) ? tower : closest;
-  }, null);
-  const center = preferred.x + preferred.w / 2;
-  return center + (side === 'left' ? -48 : 48) + (side === 'left' ? dropPadding : -dropPadding);
+  const anchor = side === 'left' ? living[0] : living[living.length - 1];
+  const anchorCenter = anchor.x + anchor.w / 2;
+  const sign = side === 'left' ? -1 : 1;
+  const baseOffset = 48;
+  return anchorCenter + sign * (baseOffset - dropPadding) * 6;
 }
 
 export function scalePositions(world, baseWorld = { width: 960 }) {
