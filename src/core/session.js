@@ -21,6 +21,7 @@ import {
   updateTowers,
   updateCrownDrop,
 } from '../systems/combat.js';
+import { applyPlayerAuraHit, updateAuraRecovery } from '../systems/aura.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { updateEnemySpawns } from '../systems/spawning.js';
 
@@ -174,7 +175,11 @@ export class GameSession {
       return { snapshot: this.getSnapshot(), outcome: 'ended' };
     }
 
-  const swordCallbacks = {
+    updateAuraRecovery(this.store.player, state, this.store.baseWorld, world, scaledDt);
+
+    const handlePlayerHit = () => applyPlayerAuraHit(this.store.player, state);
+
+    const swordCallbacks = {
       onHit: (enemy) => {
         const centerX = enemy.x + enemy.w / 2;
         const centerY = enemy.y + enemy.h / 2;
@@ -230,9 +235,10 @@ export class GameSession {
       [...this.store.walls, ...this.store.towers, ...this.store.barricades],
       this.store.player,
       world,
-      null,
+      state.effects,
       scaledDt,
       this.store.rng,
+      handlePlayerHit,
     );
     state.enemyProjectiles = hostileProjectiles.remaining;
     updateEnemySpawns(
@@ -243,7 +249,7 @@ export class GameSession {
       this.store.rng,
       state.effects,
     );
-    checkCrownLoss(state.enemies, this.store.player, state, state.effects);
+    checkCrownLoss(state.enemies, this.store.player, state, state.effects, handlePlayerHit);
     updateCrownDrop(state, scaledDt);
     this.store.barricades = this.store.barricades.filter((b) => b.hp > 0);
     state.enemies = cleanupEnemies(state.enemies, world);

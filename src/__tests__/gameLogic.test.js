@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ECONOMY } from '../core/constants.js';
+import { AURA, ECONOMY } from '../core/constants.js';
 import { createGameStore, resetGameStore, updateWorldDimensions } from '../state/store.js';
 import { createEnemy } from '../state/entities.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
@@ -8,6 +8,7 @@ import { applyInputToPlayer, updatePlayer } from '../systems/movement.js';
 import { updateEnemySpawns } from '../systems/spawning.js';
 import { deriveWaveDefinition } from '../state/waves.js';
 import { createIslandContext } from '../state/islands.js';
+import { applyPlayerAuraHit, updateAuraRecovery } from '../systems/aura.js';
 
 describe('game logic systems', () => {
   it('awards currency per cycle and ends after enough nights', () => {
@@ -263,6 +264,33 @@ describe('game logic systems', () => {
     const thirdWave = updateEnemySpawns(state, world, spawnEnemyFactory, state.waveInterval, store.rng, state.effects);
     expect(thirdWave).toHaveLength(1);
     expect(state.waveTimer).toBeCloseTo(state.waveInterval, 2);
+  });
+
+  it('shrinks aura and drops gold on hits, then recovers inside territory', () => {
+    const store = createGameStore();
+    const { player, state, world, baseWorld } = store;
+    state.currency = 10;
+    const startingAura = player.aura;
+
+    const applied = applyPlayerAuraHit(player, state);
+    expect(applied).toBe(true);
+    expect(player.aura).toBeLessThan(startingAura);
+    expect(state.currency).toBe(10 - AURA.goldDropPerHit);
+
+    player.auraRecoverDelay = 0;
+    const auraAfterHit = player.aura;
+    updateAuraRecovery(player, state, baseWorld, world, 1);
+    expect(player.aura).toBeGreaterThan(auraAfterHit);
+  });
+
+  it('falls after another hit when in a critical state', () => {
+    const store = createGameStore();
+    const { player, state } = store;
+    player.aura = 0;
+    player.critical = true;
+
+    applyPlayerAuraHit(player, state);
+    expect(state.playerFallen).toBe(true);
   });
 
   it('derives shorter wave intervals on later nights', () => {

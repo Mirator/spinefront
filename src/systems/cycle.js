@@ -48,6 +48,10 @@ export function updateDayNight(state, world, dt) {
 }
 
 export function checkEndConditions(state, world) {
+  if (state.playerFallen) {
+    state.ended = true;
+    return 'loss';
+  }
   if (state.crownLost) {
     state.ended = true;
     return 'loss';

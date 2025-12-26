@@ -24,6 +24,18 @@ export const ECONOMY = {
   barricadeCost: 7,
 };
 
+export const AURA = {
+  max: 100,
+  hitLoss: 38,
+  hitCooldown: 0.65,
+  recoverDelay: 1.1,
+  recoverRate: 12,
+  recoveryGoldThreshold: 4,
+  criticalRecoveryBuffer: 6,
+  territoryPadding: 80,
+  goldDropPerHit: 3,
+};
+
 export const SHRINE_TECH = {
   costs: [10, 16, 24],
   branches: {
