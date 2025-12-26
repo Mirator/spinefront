@@ -6,6 +6,7 @@ export function createEffectsState() {
     vignette: { timer: 0, duration: 0, intensity: 0 },
     slowdown: { timer: 0, duration: 0, minScale: 1 },
     timeScale: 1,
+    warnings: [],
   };
 }
 
@@ -13,6 +14,10 @@ export function updateEffects(effects, dt, rng) {
   effects.hitFlashes = effects.hitFlashes
     .map((flash) => ({ ...flash, timer: flash.timer - dt }))
     .filter((flash) => flash.timer > 0);
+
+  effects.warnings = effects.warnings
+    .map((warning) => ({ ...warning, timer: warning.timer - dt }))
+    .filter((warning) => warning.timer > 0);
 
   const shake = effects.screenShake;
   if (shake.duration > 0) {
@@ -74,4 +79,8 @@ export function addHitFlash(effects, x, y, canvasWidth, canvasHeight, rng) {
     duration: 0.2,
     angle: (rng?.uniform ? rng.uniform(-25, 25) : Math.random() * 50 - 25),
   });
+}
+
+export function addEdgeWarning(effects, side, duration = 1) {
+  effects.warnings.push({ side, timer: duration, duration });
 }

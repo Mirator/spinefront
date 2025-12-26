@@ -19,6 +19,7 @@ import {
   updateProjectiles,
   updateSwordCollision,
   updateTowers,
+  updateCrownDrop,
 } from '../systems/combat.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { updateEnemySpawns } from '../systems/spawning.js';
@@ -32,8 +33,10 @@ function createSnapshot(store) {
     shrine: store.shrine,
     walls: store.walls,
     towers: store.towers,
+    barricades: store.barricades,
     enemies: store.state.enemies,
     projectiles: store.state.projectiles,
+    enemyProjectiles: store.state.enemyProjectiles,
   };
 }
 
@@ -171,7 +174,7 @@ export class GameSession {
       return { snapshot: this.getSnapshot(), outcome: 'ended' };
     }
 
-    const swordCallbacks = {
+  const swordCallbacks = {
       onHit: (enemy) => {
         const centerX = enemy.x + enemy.w / 2;
         const centerY = enemy.y + enemy.h / 2;
@@ -180,7 +183,16 @@ export class GameSession {
       },
     };
 
-    const swung = applyInputToPlayer(this.store.player, this.store.input, state, this.store.shrine, this.store.towers);
+    const swung = applyInputToPlayer(
+      this.store.player,
+      this.store.input,
+      state,
+      this.store.shrine,
+      this.store.towers,
+      this.store.walls,
+      this.store.barricades,
+      this.store.world,
+    );
     if (swung) {
       swingSword(this.store.player, state.enemies, 25, swordCallbacks);
     }
@@ -191,26 +203,49 @@ export class GameSession {
 
     updatePlayer(this.store.player, world, scaledDt, this.store.shrine);
     updateCamera(this.store.camera, this.store.player, world);
-    resolveEnemyAttacks(state.enemies, [...this.store.walls, ...this.store.towers], world, scaledDt, this.store.rng);
-    updateTowers(this.store.towers, state.enemies, state.projectiles, state.shrineUnlocked, scaledDt);
+    resolveEnemyAttacks(
+      state.enemies,
+      [...this.store.walls, ...this.store.towers, ...this.store.barricades],
+      world,
+      scaledDt,
+      this.store.rng,
+      state.enemyProjectiles,
+    );
+    updateTowers(this.store.towers, state.enemies, state.projectiles, state.shrineTech, scaledDt);
 
     const projectileResults = updateProjectiles(
       state.projectiles,
       state.enemies,
+      [...this.store.walls, ...this.store.towers, ...this.store.barricades],
+      this.store.player,
       world,
       state.effects,
       scaledDt,
       this.store.rng,
     );
     state.projectiles = projectileResults.remaining;
+    const hostileProjectiles = updateProjectiles(
+      state.enemyProjectiles,
+      state.enemies,
+      [...this.store.walls, ...this.store.towers, ...this.store.barricades],
+      this.store.player,
+      world,
+      null,
+      scaledDt,
+      this.store.rng,
+    );
+    state.enemyProjectiles = hostileProjectiles.remaining;
     updateEnemySpawns(
       state,
       world,
       (side, enemyType) => createEnemy(side, world, this.store.towers, state.modifiers, enemyType),
       scaledDt,
       this.store.rng,
+      state.effects,
     );
     checkCrownLoss(state.enemies, this.store.player, state, state.effects);
+    updateCrownDrop(state, scaledDt);
+    this.store.barricades = this.store.barricades.filter((b) => b.hp > 0);
     state.enemies = cleanupEnemies(state.enemies, world);
     updateDayNight(state, world, scaledDt);
     const outcome = checkEndConditions(state, world);

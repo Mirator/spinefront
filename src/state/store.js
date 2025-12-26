@@ -3,7 +3,7 @@ import { createEffectsState } from '../systems/effects.js';
 import { createInputState, resetInputState } from '../core/input.js';
 import { createRng, normalizeSeed } from '../core/random.js';
 import { clamp } from '../systems/math.js';
-import { createPlayer, createStructureSets, createWall, createTower } from './entities.js';
+import { createBarricade, createPlayer, createStructureSets, createWall, createTower } from './entities.js';
 import { centerCameraOnPlayer, createCamera, resizeCamera } from './camera.js';
 import { createBaseModifiers, createIslandContext } from './islands.js';
 
@@ -53,6 +53,12 @@ export function createGameStore(dimensions = {}) {
     }`,
     menuStartLabel: 'Start run',
     shrineUnlocked: false,
+    shrineTech: {
+      unlocked: false,
+      selection: 'cadence',
+      selectionHeld: false,
+      branches: { cadence: 0, power: 0 },
+    },
     hudText: '',
     waveTimer: 0,
     waveInterval: 0,
@@ -60,6 +66,7 @@ export function createGameStore(dimensions = {}) {
     currentNightNumber: null,
     enemies: [],
     projectiles: [],
+    enemyProjectiles: [],
     effects: createEffectsState(),
     skyBlend: 0,
     islandLevel: 1,
@@ -70,9 +77,13 @@ export function createGameStore(dimensions = {}) {
     pendingAscend: false,
     altitude: 0,
     randomSeed: rng.seed,
+    droppedCrown: { active: false, x: 0, y: 0, timer: 0 },
+    interactionLatch: false,
+    waveDescriptors: [],
   };
 
   state.shrineUnlocked = state.learnedShrine || false;
+  state.shrineTech.unlocked = state.shrineUnlocked;
 
   return {
     baseWorld: { ...BASE_WORLD, walls: [...BASE_POSITIONS.walls], towers: [...BASE_POSITIONS.towers] },
@@ -80,6 +91,7 @@ export function createGameStore(dimensions = {}) {
     player,
     walls,
     towers,
+    barricades: [],
     shrine,
     state,
     input: createInputState(),
@@ -111,8 +123,19 @@ function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
   state.currentNightNumber = null;
   state.enemies = [];
   state.projectiles = [];
+  state.enemyProjectiles = [];
   state.skyBlend = 0;
   state.effects = createEffectsState();
+  state.droppedCrown = { active: false, x: 0, y: 0, timer: 0 };
+  state.waveDescriptors = [];
+  state.interactionLatch = false;
+
+  state.shrineTech = {
+    unlocked: state.learnedShrine || false,
+    selection: state.shrineTech?.selection || 'cadence',
+    selectionHeld: false,
+    branches: { cadence: 0, power: 0 },
+  };
 }
 
 function seedStoreRng(store, seed) {
@@ -166,6 +189,8 @@ export function resetGameStore(store, options = {}) {
   store.state.shrineUnlocked =
     (keepLearnedUpgrades && store.state.learnedShrine) || store.state.modifiers.shrineUnlocked;
   store.state.learnedShrine = store.state.shrineUnlocked;
+  store.state.shrineTech.unlocked = store.state.shrineUnlocked;
+  store.state.shrineTech.branches = { cadence: 0, power: 0 };
   store.state.menuStatus = `Island ${islandLevel}`;
   store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${
     store.state.island?.bonus?.description || 'Hold the line for three nights.'
@@ -180,6 +205,7 @@ export function resetGameStore(store, options = {}) {
   store.player.y = freshPlayer.y;
 
   rebuildStructures(store);
+  store.barricades = [];
   store.shrine.x = store.world.width / 2 - store.shrine.w / 2;
   store.shrine.y = store.world.ground - store.shrine.h;
   resizeCamera(store.camera, store.camera.w, store.camera.h, store.world);
@@ -195,6 +221,8 @@ export function ascendGameStore(store) {
   store.state.pendingAscend = false;
   store.state.shrineUnlocked = store.state.learnedShrine || store.state.modifiers.shrineUnlocked;
   store.state.learnedShrine = store.state.shrineUnlocked;
+  store.state.shrineTech.unlocked = store.state.shrineUnlocked;
+  store.state.shrineTech.branches = { cadence: 0, power: 0 };
   store.state.menuStatus = `Ascended to Island ${nextLevel}`;
   store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${
     store.state.island?.bonus?.description || ''
@@ -208,6 +236,7 @@ export function ascendGameStore(store) {
   store.player.y = freshPlayer.y;
 
   rebuildStructures(store);
+  store.barricades = [];
   store.shrine.x = store.world.width / 2 - store.shrine.w / 2;
   store.shrine.y = store.world.ground - store.shrine.h;
   resizeCamera(store.camera, store.camera.w, store.camera.h, store.world);
@@ -249,6 +278,13 @@ export function updateWorldDimensions(store, width, height) {
     tower.y = store.world.ground - tower.h;
   });
 
+  if (store.barricades) {
+    store.barricades.forEach((barricade) => {
+      barricade.x *= widthScale;
+      barricade.y = store.world.ground - barricade.h;
+    });
+  }
+
   store.shrine.x = store.world.width / 2 - store.shrine.w / 2;
   store.shrine.y = store.world.ground - store.shrine.h;
 
@@ -264,6 +300,10 @@ export function updateWorldDimensions(store, width, height) {
       enemy.y = Math.min(enemy.y, targetGround);
     }
   });
+  if (store.state.droppedCrown?.active) {
+    store.state.droppedCrown.x *= widthScale;
+    store.state.droppedCrown.y = store.world.ground - 6;
+  }
   resizeCamera(store.camera, width, height, store.world);
   centerCameraOnPlayer(store.camera, store.player, store.world);
 }

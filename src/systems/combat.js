@@ -1,4 +1,4 @@
-import { COLORS } from '../core/constants.js';
+import { COLORS, SHRINE_TECH } from '../core/constants.js';
 import { addHitFlash, triggerDangerFlash, triggerScreenShake } from './effects.js';
 
 export const BASE_PROJECTILE_DAMAGE = 18;
@@ -139,40 +139,6 @@ function dropEnemy(enemy, world, dt, rng) {
   return true;
 }
 
-export function resolveEnemyAttacks(enemies, targets, world, dt, rng) {
-  const events = [];
-  enemies.forEach((e) => {
-    if (e.hp <= 0) return;
-    if (updateCarrier(e, world, dt)) return;
-    if (dropEnemy(e, world, dt, rng)) return;
-    if (e.stunTimer > 0) {
-      e.stunTimer = Math.max(0, e.stunTimer - dt);
-      e.x += e.vx * dt;
-      e.vx *= 0.9;
-      return;
-    }
-    if (!e.target || e.target.hp <= 0) {
-      e.target = targets.find((t) => t.hp > 0 && Math.abs(t.x - e.x) < 400);
-    }
-    if (e.target && e.target.hp > 0) {
-      const dir = Math.sign(e.target.x - e.x);
-      e.vx = dir * e.speed;
-      e.x += e.vx * dt;
-      if (overlaps(e, e.target)) {
-        e.attackTimer -= dt;
-        if (e.attackTimer <= 0) {
-          applyDamage(e.target, e.attack);
-          e.attackTimer = 1 / e.attackRate;
-          events.push({ type: 'structureHit', target: e.target });
-        }
-      }
-    } else {
-      e.x += e.vx * dt;
-    }
-  });
-  return events;
-}
-
 export function spawnTowerProjectile(tower, target) {
   const muzzleX = tower.x + tower.w / 2;
   const muzzleY = tower.y + 16;
@@ -195,10 +161,26 @@ export function spawnTowerProjectile(tower, target) {
     damage: Math.round(BASE_PROJECTILE_DAMAGE * damageScale),
     life: Math.min(1.2, distance / speed + 0.35),
     color: COLORS.tower,
+    faction: 'player',
   };
 }
 
-export function updateTowers(towers, enemies, projectiles, shrineUnlocked, dt) {
+function towerCadence(tower, shrineTech) {
+  const cadenceLevel = shrineTech?.branches?.cadence || 0;
+  const cadenceDelta = SHRINE_TECH.branches?.cadence?.fireRateBonus || 0.12;
+  const cadenceBonus = 1 - cadenceLevel * cadenceDelta;
+  return Math.max(0.6, tower.fireRate * cadenceBonus);
+}
+
+function towerDamageScale(tower, shrineTech) {
+  const base = tower.baseDamageMultiplier || tower.damageMultiplier || 1;
+  const damageLevel = shrineTech?.branches?.power || 0;
+  const damageDelta = SHRINE_TECH.branches?.power?.damageBonus || 0.18;
+  const damageBonus = 1 + damageLevel * damageDelta;
+  return Math.max(0.6, base * damageBonus);
+}
+
+export function updateTowers(towers, enemies, projectiles, shrineTech, dt) {
   const firings = [];
   towers.forEach((tower) => {
     if (tower.hp <= 0) return;
@@ -211,12 +193,13 @@ export function updateTowers(towers, enemies, projectiles, shrineUnlocked, dt) {
         const dy = target.y + target.h / 2 - (tower.y + 16);
         const distance = Math.hypot(dx, dy);
         if (distance <= range) {
+          tower.damageMultiplier = towerDamageScale(tower, shrineTech);
           const projectile = spawnTowerProjectile(tower, target);
           if (projectile) {
             projectiles.push(projectile);
             firings.push({ tower, target });
           }
-          const cadence = shrineUnlocked ? Math.max(0.7, tower.fireRate * 0.75) : tower.fireRate;
+          const cadence = towerCadence(tower, shrineTech);
           tower.fireTimer = cadence;
         }
       }
@@ -225,7 +208,43 @@ export function updateTowers(towers, enemies, projectiles, shrineUnlocked, dt) {
   return firings;
 }
 
-export function updateProjectiles(projectiles, enemies, world, effects, dt, rng) {
+function pickRangedTarget(enemy, targets = []) {
+  const living = targets.filter((t) => t.hp > 0);
+  if (!living.length) return null;
+  return living.reduce((closest, target) => {
+    if (!closest) return target;
+    const dist = Math.abs(target.x + target.w / 2 - (enemy.x + enemy.w / 2));
+    const bestDist = Math.abs(closest.x + closest.w / 2 - (enemy.x + enemy.w / 2));
+    return dist < bestDist ? target : closest;
+  }, null);
+}
+
+function spawnSapperProjectile(enemy, target) {
+  const muzzleX = enemy.x + enemy.w / 2;
+  const muzzleY = enemy.y + enemy.h * 0.4;
+  const tx = target.x + target.w / 2;
+  const ty = target.y + target.h / 2;
+  const dx = tx - muzzleX;
+  const dy = ty - muzzleY;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= 0) return null;
+  const speed = enemy.ranged?.projectileSpeed || 280;
+  const vx = (dx / dist) * speed;
+  const vy = (dy / dist) * speed;
+  return {
+    x: muzzleX,
+    y: muzzleY,
+    vx,
+    vy,
+    radius: 4,
+    damage: enemy.ranged?.projectileDamage || enemy.attack,
+    life: Math.min(1.4, dist / speed + 0.3),
+    color: COLORS.sapper,
+    faction: 'enemy',
+  };
+}
+
+export function updateProjectiles(projectiles, enemies, structures = [], player, world, effects, dt, rng) {
   const remaining = [];
   const hits = [];
   projectiles.forEach((p) => {
@@ -234,25 +253,26 @@ export function updateProjectiles(projectiles, enemies, world, effects, dt, rng)
     next.y += next.vy * dt;
     next.life -= dt;
 
-    let hitEnemy = null;
-    for (const enemy of enemies) {
-      if (enemy.hp <= 0) continue;
-      const withinX = next.x > enemy.x - next.radius && next.x < enemy.x + enemy.w + next.radius;
-      const withinY = next.y > enemy.y - next.radius && next.y < enemy.y + enemy.h + next.radius;
+    let hitTarget = null;
+    const targetPool = next.faction === 'player' ? enemies : structures;
+    for (const target of targetPool) {
+      if (target.hp <= 0) continue;
+      const withinX = next.x > target.x - next.radius && next.x < target.x + target.w + next.radius;
+      const withinY = next.y > target.y - next.radius && next.y < target.y + target.h + next.radius;
       if (withinX && withinY) {
-        hitEnemy = enemy;
+        hitTarget = target;
         break;
       }
     }
 
-    if (hitEnemy) {
-      applyDamage(hitEnemy, next.damage);
-      hits.push({ projectile: next, enemy: hitEnemy });
-      if (effects) {
+    if (hitTarget) {
+      applyDamage(hitTarget, next.damage);
+      hits.push({ projectile: next, target: hitTarget });
+      if (effects && next.faction === 'player') {
         addHitFlash(
           effects,
-          hitEnemy.x + hitEnemy.w / 2,
-          hitEnemy.y + hitEnemy.h / 2,
+          hitTarget.x + hitTarget.w / 2,
+          hitTarget.y + hitTarget.h / 2,
           world.width,
           world.height,
           rng,
@@ -279,11 +299,14 @@ export function checkCrownLoss(enemies, player, state, effects) {
     if (e.hp <= 0) return;
     if (overlaps(e, player)) {
       playerHit = true;
-      if (player.crown) {
+      if (player.crown && !state.droppedCrown?.active) {
         player.crown = false;
-        if (state) {
-          state.crownLost = true;
-        }
+        state.droppedCrown = {
+          active: true,
+          x: player.x + player.w / 2,
+          y: player.y + player.h,
+          timer: 10,
+        };
       }
     }
   });
@@ -294,6 +317,82 @@ export function checkCrownLoss(enemies, player, state, effects) {
   return playerHit;
 }
 
+export function updateCrownDrop(state, dt) {
+  if (!state.droppedCrown?.active) return;
+  state.droppedCrown.timer = Math.max(0, state.droppedCrown.timer - dt);
+  if (state.droppedCrown.timer <= 0 && !state.crownLost) {
+    state.crownLost = true;
+  }
+}
+
 export function cleanupEnemies(enemies, world) {
   return enemies.filter((e) => e.hp > 0 && e.x >= -120 && e.x <= world.width + 120);
+}
+
+export function resolveEnemyAttacks(enemies, targets, world, dt, rng, enemyProjectiles = []) {
+  const events = [];
+  enemies.forEach((e) => {
+    if (e.hp <= 0) return;
+    if (updateCarrier(e, world, dt)) return;
+    if (dropEnemy(e, world, dt, rng)) return;
+    if (e.stunTimer > 0) {
+      e.stunTimer = Math.max(0, e.stunTimer - dt);
+      e.x += e.vx * dt;
+      e.vx *= 0.9;
+      return;
+    }
+
+    const livingTargets = targets.filter((t) => t.hp > 0);
+    if (e.variant === 'sapper' && e.ranged) {
+      if (!e.target || e.target.hp <= 0) {
+        e.target = pickRangedTarget(e, livingTargets);
+      }
+      if (e.target && e.target.hp > 0) {
+        const center = e.x + e.w / 2;
+        const targetCenter = e.target.x + e.target.w / 2;
+        const dir = Math.sign(targetCenter - center) || 1;
+        const distance = Math.abs(targetCenter - center);
+        if (distance > e.ranged.preferredRange) {
+          e.vx = dir * e.speed;
+          e.x += e.vx * dt;
+        } else if (distance < e.w * 1.2) {
+          e.vx = -dir * (e.speed * 0.5);
+          e.x += e.vx * dt;
+        } else {
+          e.vx = 0;
+        }
+        e.attackTimer -= dt;
+        if (e.attackTimer <= 0 && distance <= e.ranged.range) {
+          const projectile = spawnSapperProjectile(e, e.target);
+          if (projectile) {
+            enemyProjectiles.push(projectile);
+          }
+          e.attackTimer = 1 / e.attackRate;
+        }
+      } else {
+        e.x += e.vx * dt;
+      }
+      return;
+    }
+
+    if (!e.target || e.target.hp <= 0) {
+      e.target = livingTargets.find((t) => Math.abs(t.x - e.x) < 400);
+    }
+    if (e.target && e.target.hp > 0) {
+      const dir = Math.sign(e.target.x - e.x);
+      e.vx = dir * e.speed;
+      e.x += e.vx * dt;
+      if (overlaps(e, e.target)) {
+        e.attackTimer -= dt;
+        if (e.attackTimer <= 0) {
+          applyDamage(e.target, e.attack);
+          e.attackTimer = 1 / e.attackRate;
+          events.push({ type: 'structureHit', target: e.target });
+        }
+      }
+    } else {
+      e.x += e.vx * dt;
+    }
+  });
+  return events;
 }

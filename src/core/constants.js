@@ -20,6 +20,26 @@ export const ECONOMY = {
   dayIncome: 10,
   nightIncome: 5,
   shrineCost: 10,
+  repairCost: 4,
+  barricadeCost: 7,
+};
+
+export const SHRINE_TECH = {
+  costs: [10, 16, 24],
+  branches: {
+    cadence: {
+      id: 'cadence',
+      label: 'Rapid Volley',
+      description: 'Tower cadence improves with each tier.',
+      fireRateBonus: 0.12,
+    },
+    power: {
+      id: 'power',
+      label: 'Sun Lances',
+      description: 'Tower damage rises with each tier.',
+      damageBonus: 0.18,
+    },
+  },
 };
 
 export const BASE_POSITIONS = {
@@ -33,9 +53,12 @@ export const COLORS = {
   playerEye: '#0b1a2c',
   wall: '#cbd5ff',
   tower: '#a5b4fc',
+  barricade: '#f59e0b',
   enemy: '#ff9aa2',
+  sapper: '#fb923c',
   shrine: '#7de3c5',
   crown: '#fcd34d',
+  beacon: '#f472b6',
   wyvern: '#9ca3af',
   islandTop: '#4ade80',
   islandShadow: '#115e3d',
