@@ -1,5 +1,5 @@
 import { ECONOMY } from '../core/constants.js';
-import { calculateWaveInterval } from './spawning.js';
+import { deriveWaveDefinition } from '../state/waves.js';
 import { clamp } from './math.js';
 
 export function updateDayNight(state, world, dt) {
@@ -13,7 +13,9 @@ export function updateDayNight(state, world, dt) {
       state.currency += ECONOMY.nightIncome + incomeBonus;
       const upcomingNight = state.nightsSurvived + 1;
       state.currentNightNumber = upcomingNight;
-      state.waveInterval = calculateWaveInterval(upcomingNight);
+      const wave = deriveWaveDefinition(upcomingNight, state.island, state.modifiers);
+      state.waveDefinition = wave;
+      state.waveInterval = wave.interval;
       state.waveTimer = state.waveInterval;
       state.hudText = `Night ${upcomingNight} begins.`;
       events.becameNight = true;
@@ -24,6 +26,7 @@ export function updateDayNight(state, world, dt) {
       state.currentNightNumber = null;
       state.waveTimer = 0;
       state.waveInterval = 0;
+      state.waveDefinition = null;
       state.hudText = `Sunrise! You earned income.`;
       events.becameDay = true;
     }

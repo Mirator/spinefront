@@ -206,7 +206,7 @@ export class GameSession {
     updateEnemySpawns(
       state,
       world,
-      (side) => createEnemy(side, world, this.store.towers, state.modifiers),
+      (side, enemyType) => createEnemy(side, world, this.store.towers, state.modifiers, enemyType),
       scaledDt,
       this.store.rng,
     );

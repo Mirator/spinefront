@@ -5,7 +5,7 @@ import { createRng, normalizeSeed } from '../core/random.js';
 import { clamp } from '../systems/math.js';
 import { createPlayer, createStructureSets, createWall, createTower } from './entities.js';
 import { centerCameraOnPlayer, createCamera, resizeCamera } from './camera.js';
-import { createIslandContext, DEFAULT_MODIFIERS } from './islands.js';
+import { createBaseModifiers, createIslandContext } from './islands.js';
 
 function applyAltitude(store) {
   const heightRatio = store.world.height / store.baseWorld.height;
@@ -56,6 +56,7 @@ export function createGameStore(dimensions = {}) {
     hudText: '',
     waveTimer: 0,
     waveInterval: 0,
+    waveDefinition: null,
     currentNightNumber: null,
     enemies: [],
     projectiles: [],
@@ -64,7 +65,7 @@ export function createGameStore(dimensions = {}) {
     islandLevel: 1,
     islandHistory: [island.bonus?.id].filter(Boolean),
     island,
-    modifiers: island.modifiers || { ...DEFAULT_MODIFIERS },
+    modifiers: island.modifiers || createBaseModifiers(),
     learnedShrine: island.modifiers?.shrineUnlocked || false,
     pendingAscend: false,
     altitude: 0,
@@ -106,6 +107,7 @@ function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
   state.hudText = '';
   state.waveTimer = 0;
   state.waveInterval = 0;
+  state.waveDefinition = null;
   state.currentNightNumber = null;
   state.enemies = [];
   state.projectiles = [];
@@ -149,7 +151,7 @@ function assignIsland(store, level, { keepHistory = false } = {}) {
   store.state.islandLevel = level;
   store.state.islandHistory = [...history, islandContext.bonus?.id].filter(Boolean);
   store.state.island = islandContext;
-  store.state.modifiers = islandContext.modifiers || { ...DEFAULT_MODIFIERS };
+  store.state.modifiers = islandContext.modifiers || createBaseModifiers();
   store.state.altitude = (level - 1) * (BASE_WORLD.altitudeStep || 24);
 }
 

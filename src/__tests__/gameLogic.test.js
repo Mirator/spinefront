@@ -5,7 +5,9 @@ import { createEnemy } from '../state/entities.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { resolveEnemyAttacks, swingSword, updateProjectiles, updateTowers } from '../systems/combat.js';
 import { applyInputToPlayer, updatePlayer } from '../systems/movement.js';
-import { calculateWaveInterval, updateEnemySpawns } from '../systems/spawning.js';
+import { updateEnemySpawns } from '../systems/spawning.js';
+import { deriveWaveDefinition } from '../state/waves.js';
+import { createIslandContext } from '../state/islands.js';
 
 describe('game logic systems', () => {
   it('awards currency per cycle and ends after enough nights', () => {
@@ -53,7 +55,7 @@ describe('game logic systems', () => {
     const spawned = updateEnemySpawns(
       store.state,
       store.world,
-      (side) => createEnemy(side, store.world),
+      (side, enemyType) => createEnemy(side, store.world, [], store.state.modifiers, enemyType),
       0.1,
       store.rng,
     );
@@ -223,22 +225,62 @@ describe('game logic systems', () => {
     const { state, world } = store;
     state.isNight = true;
     state.currentNightNumber = 2;
-    state.waveInterval = calculateWaveInterval(state.currentNightNumber);
+    state.waveDefinition = deriveWaveDefinition(state.currentNightNumber, state.island, state.modifiers);
+    state.waveInterval = state.waveDefinition.interval;
     state.waveTimer = 0;
-    const expectedInterval = state.waveInterval;
+    const expectedInterval = state.waveDefinition.interval;
 
-    const firstWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), 0, store.rng);
+    const spawnEnemyFactory = (side, enemyType) => createEnemy(side, world, [], state.modifiers, enemyType);
+
+    const firstWave = updateEnemySpawns(state, world, spawnEnemyFactory, 0, store.rng);
     expect(firstWave).toHaveLength(1);
     expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
 
-    const secondWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval, store.rng);
+    const secondWave = updateEnemySpawns(state, world, spawnEnemyFactory, expectedInterval, store.rng);
     expect(secondWave).toHaveLength(1);
     expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
 
-    const thirdWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval, store.rng);
+    const thirdWave = updateEnemySpawns(state, world, spawnEnemyFactory, expectedInterval, store.rng);
     expect(thirdWave).toHaveLength(1);
     expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
     expect(state.waveTimer).toBeCloseTo(expectedInterval, 5);
+  });
+
+  it('derives shorter wave intervals on later nights', () => {
+    const earlyWave = deriveWaveDefinition(1);
+    const lateWave = deriveWaveDefinition(3);
+    expect(lateWave.interval).toBeLessThanOrEqual(earlyWave.interval);
+  });
+
+  it('lets islands alter wave behavior', () => {
+    const calmIsland = createIslandContext(1);
+    const tempestIsland = createIslandContext(4);
+    const calmWave = deriveWaveDefinition(1, calmIsland, calmIsland.modifiers);
+    const tempestWave = deriveWaveDefinition(1, tempestIsland, tempestIsland.modifiers);
+    expect(tempestWave.interval).toBeLessThan(calmWave.interval);
+    expect(tempestWave.sideBias.left).toBeGreaterThan(calmWave.sideBias.left);
+  });
+
+  it('applies island wave modifiers to timing and side weighting', () => {
+    const store = createGameStore();
+    const { state, world } = store;
+    state.isNight = true;
+    const baseWave = deriveWaveDefinition(1, state.island, {
+      ...state.modifiers,
+      waveIntervalScale: 1,
+      waveSideWeights: { left: 1, right: 1 },
+    });
+
+    state.modifiers.waveIntervalScale = 0.5;
+    state.modifiers.waveSideWeights = { left: 3, right: 0.2 };
+    state.waveTimer = 0;
+    state.currentNightNumber = 1;
+    const rng = { boolean: () => true, int: (min) => min };
+    const spawner = (side, enemyType) => createEnemy(side, world, [], state.modifiers, enemyType);
+
+    updateEnemySpawns(state, world, spawner, 0, rng);
+    expect(state.waveInterval).toBeCloseTo(baseWave.interval * state.modifiers.waveIntervalScale, 5);
+    expect(state.enemies[0].spawnSide).toBe('left');
   });
 
   it('preserves camera dimensions on reset after resizing the world', () => {
