@@ -295,5 +295,5 @@ export function checkCrownLoss(enemies, player, state, effects) {
 }
 
 export function cleanupEnemies(enemies, world) {
-  return enemies.filter((e) => e.hp > 0 && e.x > -120 && e.x < world.width + 120);
+  return enemies.filter((e) => e.hp > 0 && e.x >= -120 && e.x <= world.width + 120);
 }

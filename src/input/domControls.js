@@ -1,17 +1,19 @@
-export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => false, onStart, onToggleMenu }) {
+export function bindDomControls({ applyInput, isEnded, onReset, isMenuOpen = () => false, onStart, onToggleMenu }) {
   const upJumpSources = new Set();
+  const updateInput = (patch) => {
+    if (typeof applyInput !== 'function') return;
+    applyInput((input) => Object.assign(input, patch));
+  };
 
   const engageUpJump = (source) => {
     upJumpSources.add(source);
-    input.up = true;
-    input.jump = true;
+    updateInput({ up: true, jump: true });
   };
 
   const releaseUpJump = (source) => {
     upJumpSources.delete(source);
     const active = upJumpSources.size > 0;
-    input.up = active;
-    input.jump = active;
+    updateInput({ up: active, jump: active });
   };
 
   const keydown = (e) => {
@@ -34,12 +36,12 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
       engageUpJump(e.code);
       return;
     }
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
-    if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
-    if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = true;
-    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = true;
-    if (e.code === 'KeyF') input.attack = true;
-    if (e.code === 'KeyE') input.interact = true;
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') updateInput({ left: true });
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') updateInput({ right: true });
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') updateInput({ down: true });
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') updateInput({ sprint: true });
+    if (e.code === 'KeyF') updateInput({ attack: true });
+    if (e.code === 'KeyE') updateInput({ interact: true });
   };
 
   const keyup = (e) => {
@@ -48,12 +50,12 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
       return;
     }
     if (isEnded()) return;
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
-    if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
-    if (e.code === 'ArrowDown' || e.code === 'KeyS') input.down = false;
-    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = false;
-    if (e.code === 'KeyF') input.attack = false;
-    if (e.code === 'KeyE') input.interact = false;
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') updateInput({ left: false });
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') updateInput({ right: false });
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') updateInput({ down: false });
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') updateInput({ sprint: false });
+    if (e.code === 'KeyF') updateInput({ attack: false });
+    if (e.code === 'KeyE') updateInput({ interact: false });
   };
 
   document.addEventListener('keydown', keydown);
@@ -61,28 +63,27 @@ export function bindDomControls({ input, isEnded, onReset, isMenuOpen = () => fa
 
   const touchControls = [
     { id: 'control-up', onStart: () => engageUpJump('control-up'), onEnd: () => releaseUpJump('control-up'), ignoreEnded: true },
-    { id: 'control-left', onStart: () => (input.left = true), onEnd: () => (input.left = false), ignoreEnded: true },
-    { id: 'control-down', onStart: () => (input.down = true), onEnd: () => (input.down = false), ignoreEnded: true },
-    { id: 'control-right', onStart: () => (input.right = true), onEnd: () => (input.right = false), ignoreEnded: true },
+    { id: 'control-left', onStart: () => updateInput({ left: true }), onEnd: () => updateInput({ left: false }), ignoreEnded: true },
+    { id: 'control-down', onStart: () => updateInput({ down: true }), onEnd: () => updateInput({ down: false }), ignoreEnded: true },
+    { id: 'control-right', onStart: () => updateInput({ right: true }), onEnd: () => updateInput({ right: false }), ignoreEnded: true },
     { id: 'control-jump', onStart: () => engageUpJump('control-jump'), onEnd: () => releaseUpJump('control-jump'), ignoreEnded: true },
-    { id: 'control-attack', onStart: () => (input.attack = true), onEnd: () => (input.attack = false), ignoreEnded: true },
-    { id: 'control-interact', onStart: () => (input.interact = true), onEnd: () => (input.interact = false), ignoreEnded: true },
+    { id: 'control-attack', onStart: () => updateInput({ attack: true }), onEnd: () => updateInput({ attack: false }), ignoreEnded: true },
+    { id: 'control-interact', onStart: () => updateInput({ interact: true }), onEnd: () => updateInput({ interact: false }), ignoreEnded: true },
   ];
 
   const touchHandlers = touchControls.map((cfg) => bindTouchControl(cfg, isEnded, isMenuOpen));
   const joystickCleanup = bindVirtualJoystick({
     id: 'control-joystick',
     onMove: (dir) => {
-      input.left = dir.left;
-      input.right = dir.right;
-      input.up = dir.up;
-      input.down = dir.down;
+      updateInput({
+        left: dir.left,
+        right: dir.right,
+        up: dir.up,
+        down: dir.down,
+      });
     },
     onEnd: () => {
-      input.left = false;
-      input.right = false;
-      input.up = false;
-      input.down = false;
+      updateInput({ left: false, right: false, up: false, down: false });
     },
     isEnded,
     isMenuOpen,
