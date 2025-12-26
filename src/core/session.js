@@ -12,7 +12,6 @@ import { updateCamera } from '../state/camera.js';
 import { addHitFlash, triggerSlowdown, updateEffects } from '../systems/effects.js';
 import { applyInputToPlayer, updatePlayer } from '../systems/movement.js';
 import {
-  applyPlayerAuraHit,
   checkCrownLoss,
   cleanupEnemies,
   resolveEnemyAttacks,
@@ -22,7 +21,7 @@ import {
   updateTowers,
   updateCrownDrop,
 } from '../systems/combat.js';
-import { updateAuraRecovery } from '../systems/aura.js';
+import { applyPlayerAuraHit, updateAuraRecovery } from '../systems/aura.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { updateEnemySpawns } from '../systems/spawning.js';
 
