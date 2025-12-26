@@ -2,6 +2,7 @@ import { COLORS } from './core/constants.js';
 import { GameSession } from './core/session.js';
 import { bindDomControls } from './input/domControls.js';
 import { createRenderer } from './render/renderer.js';
+import { MENU_STATES } from './state/machine.js';
 
 const canvas = document.getElementById('game');
 const fullscreenButton = document.getElementById('fullscreen-toggle');
@@ -40,22 +41,6 @@ function resetGame() {
   syncMenuUiState();
   window.dispatchEvent(new CustomEvent('spinefront:reset'));
   renderer.render(session.getSnapshot());
-}
-
-function updateMenu(reason = 'paused') {
-  session.updateMenu(reason);
-}
-
-function openMenu(reason = 'paused') {
-  session.openMenu(reason);
-  syncMenuUiState();
-  updateMenu(reason);
-}
-
-function closeMenu() {
-  session.closeMenu();
-  syncMenuUiState();
-  updateMenu();
 }
 
 function startFromMenu(reset = false) {
@@ -183,8 +168,9 @@ resizeCanvas();
 refreshFullscreenButton();
 
 renderer.render(session.getSnapshot());
-openMenu('intro');
-updateMenu('intro');
+session.setMenuState(MENU_STATES.INTRO);
+syncMenuUiState();
+renderer.render(session.getSnapshot());
 
 requestAnimationFrame(loop);
 

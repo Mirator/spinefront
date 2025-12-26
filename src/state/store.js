@@ -213,16 +213,23 @@ export function ascendGameStore(store) {
 }
 
 export function updateWorldDimensions(store, width, height) {
+  const prevWidth = store.world.width || width * WORLD_SCALE.x;
+  const prevHeight = store.world.height || height * WORLD_SCALE.y;
   const scaledWidth = width * WORLD_SCALE.x;
   const scaledHeight = height * WORLD_SCALE.y;
   const widthRatio = scaledWidth / store.baseWorld.width;
   const heightRatio = scaledHeight / store.baseWorld.height;
+  const widthScale = scaledWidth / prevWidth;
+  const heightScale = scaledHeight / prevHeight;
 
   store.world.width = scaledWidth;
   store.world.height = scaledHeight;
   const altitude = (store.state?.altitude || 0) * WORLD_SCALE.y;
   const groundMargin = store.baseWorld.groundMargin * heightRatio;
   store.world.ground = Math.max(scaledHeight - groundMargin - altitude, scaledHeight * 0.48);
+
+  store.player.x *= widthScale;
+  store.player.y *= heightScale;
 
   store.walls.forEach((wall, idx) => {
     const baseX = (store.baseWorld.walls || [])[idx];
