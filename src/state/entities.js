@@ -68,7 +68,7 @@ export function createShrine(world) {
   };
 }
 
-export function createEnemy(side, world, towers = [], modifiers = {}) {
+export function createEnemy(side, world, towers = [], modifiers = {}, variant = 'enemy') {
   const spawnPadding = 120;
   const x = side === 'left' ? -spawnPadding : world.width + spawnPadding;
   const speedScale = modifiers.enemySpeed || 1;
@@ -87,6 +87,8 @@ export function createEnemy(side, world, towers = [], modifiers = {}) {
   };
   return {
     type: 'enemy',
+    variant,
+    spawnSide: side,
     x,
     y: world.ground - 140,
     w: 28,

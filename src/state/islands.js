@@ -8,6 +8,8 @@ export const DEFAULT_MODIFIERS = {
   enemyHp: 1,
   wyvernSpeed: 1,
   dropPadding: 0,
+  waveIntervalScale: 1,
+  waveSideWeights: { left: 1, right: 1 },
 };
 
 export const ISLAND_BONUSES = [
@@ -40,10 +42,14 @@ export const ISLAND_BONUSES = [
   {
     id: 'tempest',
     name: 'Tempest Truss',
-    description: 'Wyverns ride lightning (+20% flight speed) and drop foes closer to the keep.',
+    description:
+      'Wyverns ride lightning (+20% flight speed), drop foes closer to the keep, and waves strike faster.',
     apply(modifiers) {
       modifiers.wyvernSpeed *= 1.2;
       modifiers.dropPadding = 36;
+      modifiers.waveIntervalScale *= 0.85;
+      modifiers.waveSideWeights.left *= 1.1;
+      modifiers.waveSideWeights.right *= 0.9;
     },
   },
   {
@@ -76,9 +82,16 @@ export function createIslandContext(level, history = []) {
 }
 
 export function applyBonusToModifiers(bonus) {
-  const modifiers = { ...DEFAULT_MODIFIERS };
+  const modifiers = createBaseModifiers();
   if (bonus?.apply) {
     bonus.apply(modifiers);
   }
   return modifiers;
+}
+
+export function createBaseModifiers() {
+  return {
+    ...DEFAULT_MODIFIERS,
+    waveSideWeights: { ...DEFAULT_MODIFIERS.waveSideWeights },
+  };
 }
