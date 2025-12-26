@@ -86,10 +86,6 @@ export function updateSwordCollision(player, enemies, callbacks = {}, damage = 2
       if (player.swingHitIds.has(enemy)) return;
       player.swingHitIds.add(enemy);
       applyDamage(enemy, damage);
-      const knockback = player.swingFacing * 220;
-      enemy.vx = knockback;
-      enemy.stunTimer = Math.max(enemy.stunTimer || 0, 0.22);
-      enemy.x += knockback * 0.05;
       hits.push(enemy);
       if (callbacks.onHit) {
         callbacks.onHit(enemy);

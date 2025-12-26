@@ -5,7 +5,7 @@ import { createGameStore, resetGameStore, updateWorldDimensions } from './state/
 import { updateCamera } from './state/camera.js';
 import { createEnemy } from './state/entities.js';
 import { createRenderer } from './render/renderer.js';
-import { addHitFlash, triggerScreenShake, triggerSlowdown, updateEffects } from './systems/effects.js';
+import { addHitFlash, triggerSlowdown, updateEffects } from './systems/effects.js';
 import { applyInputToPlayer, updatePlayer } from './systems/movement.js';
 import {
   checkCrownLoss,
@@ -198,7 +198,6 @@ function gameStep(dt) {
       const centerX = enemy.x + enemy.w / 2;
       const centerY = enemy.y + enemy.h / 2;
       addHitFlash(store.state.effects, centerX, centerY, store.world.width, store.world.height);
-      triggerScreenShake(store.state.effects, 5, 0.22);
       triggerSlowdown(store.state.effects, 0.18, 0.55);
     },
   };
