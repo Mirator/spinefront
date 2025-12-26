@@ -9,7 +9,8 @@ export function updateDayNight(state, world, dt) {
     state.dayTimer = 0;
     state.isNight = !state.isNight;
     if (state.isNight) {
-      state.currency += ECONOMY.nightIncome;
+      const incomeBonus = state.modifiers?.incomeBonus || 0;
+      state.currency += ECONOMY.nightIncome + incomeBonus;
       const upcomingNight = state.nightsSurvived + 1;
       state.currentNightNumber = upcomingNight;
       state.waveInterval = calculateWaveInterval(upcomingNight);
@@ -18,7 +19,8 @@ export function updateDayNight(state, world, dt) {
       events.becameNight = true;
     } else {
       state.nightsSurvived += 1;
-      state.currency += ECONOMY.dayIncome;
+      const incomeBonus = state.modifiers?.incomeBonus || 0;
+      state.currency += ECONOMY.dayIncome + incomeBonus;
       state.currentNightNumber = null;
       state.waveTimer = 0;
       state.waveInterval = 0;
@@ -46,8 +48,9 @@ export function checkEndConditions(state, world) {
     return 'loss';
   }
   if (!state.isNight && state.nightsSurvived >= world.nightsToWin) {
-    state.ended = true;
-    return 'win';
+    state.pendingAscend = true;
+    state.paused = true;
+    return 'ascend';
   }
   return null;
 }

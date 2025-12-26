@@ -1,7 +1,7 @@
 import { COLORS } from './core/constants.js';
 import { resetInputState } from './core/input.js';
 import { bindDomControls } from './input/domControls.js';
-import { createGameStore, resetGameStore, updateWorldDimensions } from './state/store.js';
+import { ascendGameStore, createGameStore, resetGameStore, updateWorldDimensions } from './state/store.js';
 import { updateCamera } from './state/camera.js';
 import { createEnemy } from './state/entities.js';
 import { createRenderer } from './render/renderer.js';
@@ -51,13 +51,28 @@ function resetGame() {
 }
 
 function updateMenu(reason = 'paused') {
-  const headline = reason === 'intro' ? 'Ready to deploy' : reason === 'ended' ? 'Run complete' : 'Run paused';
-  const detail =
-    reason === 'ended'
-      ? 'Victory or defeat, regroup and launch a fresh run.'
-      : 'Survive 3 nights, defend the crown, and unlock the shrine for faster towers.';
-  const startLabel =
-    store.state.ended || !store.state.hasStarted ? 'Start run' : reason === 'paused' ? 'Resume run' : 'Start run';
+  const islandLine =
+    store.state.island?.bonus?.name && store.state.island?.bonus?.description
+      ? `${store.state.island.bonus.name}: ${store.state.island.bonus.description}`
+      : 'Hold the line on this island, then ascend.';
+  let headline = 'Run paused';
+  let detail = islandLine;
+  if (reason === 'intro') {
+    headline = 'Ready to deploy';
+  } else if (reason === 'ended') {
+    headline = 'Run complete';
+    detail = 'Defeat or victory, regroup and launch a fresh climb.';
+  } else if (reason === 'ascend') {
+    headline = `Island ${store.state.islandLevel} cleared`;
+    detail = 'Climb to the next sky island with what you have learned.';
+  }
+  const startLabel = store.state.pendingAscend
+    ? 'Ascend'
+    : store.state.ended || !store.state.hasStarted
+      ? 'Start run'
+      : reason === 'paused'
+        ? 'Resume run'
+        : 'Start run';
   store.state.menuStatus = headline;
   store.state.menuMessage = detail;
   store.state.menuStartLabel = startLabel;
@@ -80,8 +95,11 @@ function closeMenu() {
 }
 
 function startFromMenu(reset = false) {
-  if (reset || store.state.ended || !store.state.hasStarted) {
+  if (reset || store.state.ended || (!store.state.hasStarted && !store.state.pendingAscend)) {
     resetGame();
+  } else if (store.state.pendingAscend) {
+    ascendGameStore(store);
+    store.state.pendingAscend = false;
   }
   closeMenu();
 }
@@ -213,18 +231,26 @@ function gameStep(dt) {
 
   updatePlayer(store.player, store.world, dt, store.shrine);
   updateCamera(store.camera, store.player, store.world);
-  resolveEnemyAttacks(store.state.enemies, [...store.walls, ...store.towers], dt);
+  resolveEnemyAttacks(store.state.enemies, [...store.walls, ...store.towers], store.world, dt);
   updateTowers(store.towers, store.state.enemies, store.state.projectiles, store.state.shrineUnlocked, dt);
 
   const projectileResults = updateProjectiles(store.state.projectiles, store.state.enemies, store.world, store.state.effects, dt);
   store.state.projectiles = projectileResults.remaining;
-  updateEnemySpawns(store.state, store.world, (side) => createEnemy(side, store.world), dt);
+  updateEnemySpawns(
+    store.state,
+    store.world,
+    (side) => createEnemy(side, store.world, store.towers, store.state.modifiers),
+    dt,
+  );
   checkCrownLoss(store.state.enemies, store.player, store.state, store.state.effects);
   store.state.enemies = cleanupEnemies(store.state.enemies, store.world);
   updateDayNight(store.state, store.world, dt);
-  checkEndConditions(store.state, store.world);
-  if (store.state.ended && !store.state.menuOpen) {
+  const outcome = checkEndConditions(store.state, store.world);
+  if (outcome === 'loss' && !store.state.menuOpen) {
     openMenu('ended');
+  } else if (outcome === 'ascend' && !store.state.menuOpen) {
+    store.state.hudText = `Island ${store.state.islandLevel} cleared. Ascend when ready.`;
+    openMenu('ascend');
   }
   renderer.render(snapshot());
 }

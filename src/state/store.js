@@ -4,6 +4,14 @@ import { createInputState, resetInputState } from '../core/input.js';
 import { clamp } from '../systems/math.js';
 import { createPlayer, createStructureSets, createWall, createTower } from './entities.js';
 import { centerCameraOnPlayer, createCamera, resizeCamera } from './camera.js';
+import { createIslandContext, DEFAULT_MODIFIERS } from './islands.js';
+
+function applyAltitude(store) {
+  const heightRatio = store.world.height / store.baseWorld.height;
+  const altitude = (store.state?.altitude || 0) * WORLD_SCALE.y;
+  const groundMargin = store.baseWorld.groundMargin * heightRatio;
+  store.world.ground = Math.max(store.world.height - groundMargin - altitude, store.world.height * 0.48);
+}
 
 export function createWorld(dimensions = {}) {
   const width = (dimensions.width || BASE_WORLD.width) * WORLD_SCALE.x;
@@ -20,7 +28,8 @@ export function createWorld(dimensions = {}) {
 
 export function createGameStore(dimensions = {}) {
   const world = createWorld(dimensions);
-  const { walls, towers, shrine } = createStructureSets(world, BASE_WORLD);
+  const island = createIslandContext(1, []);
+  const { walls, towers, shrine } = createStructureSets(world, BASE_WORLD, island.modifiers);
   const player = createPlayer(world);
   const camera = createCamera(dimensions.width || BASE_WORLD.width, dimensions.height || BASE_WORLD.height, world);
   centerCameraOnPlayer(camera, player, world);
@@ -36,7 +45,9 @@ export function createGameStore(dimensions = {}) {
     menuOpen: true,
     paused: true,
     menuStatus: 'Ready to deploy',
-    menuMessage: 'Survive 3 nights, defend the crown, and unlock the shrine for faster towers.',
+    menuMessage: `${island.bonus?.name || 'Sky island'} — ${
+      island.bonus?.description || 'Survive 3 nights to ascend.'
+    }`,
     menuStartLabel: 'Start run',
     shrineUnlocked: false,
     hudText: '',
@@ -47,7 +58,16 @@ export function createGameStore(dimensions = {}) {
     projectiles: [],
     effects: createEffectsState(),
     skyBlend: 0,
+    islandLevel: 1,
+    islandHistory: [island.bonus?.id].filter(Boolean),
+    island,
+    modifiers: island.modifiers || { ...DEFAULT_MODIFIERS },
+    learnedShrine: island.modifiers?.shrineUnlocked || false,
+    pendingAscend: false,
+    altitude: 0,
   };
+
+  state.shrineUnlocked = state.learnedShrine || false;
 
   return {
     baseWorld: { ...BASE_WORLD, walls: [...BASE_POSITIONS.walls], towers: [...BASE_POSITIONS.towers] },
@@ -62,29 +82,75 @@ export function createGameStore(dimensions = {}) {
   };
 }
 
-export function resetGameStore(store) {
-  store.state.time = 0;
-  store.state.dayTimer = 0;
-  store.state.isNight = false;
-  store.state.nightsSurvived = 0;
-  store.state.currency = ECONOMY.dayIncome;
-  store.state.crownLost = false;
-  store.state.ended = false;
-  store.state.hasStarted = true;
-  store.state.menuOpen = false;
-  store.state.paused = false;
-  store.state.menuStatus = 'Ready to deploy';
-  store.state.menuMessage = 'Survive 3 nights, defend the crown, and unlock the shrine for faster towers.';
+function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
+  state.time = 0;
+  state.dayTimer = 0;
+  state.isNight = false;
+  state.nightsSurvived = 0;
+  state.currency = ECONOMY.dayIncome + (modifiers.incomeBonus || 0);
+  state.crownLost = false;
+  state.ended = false;
+  state.pendingAscend = false;
+  state.hasStarted = !keepMenuOpen;
+  state.menuOpen = keepMenuOpen;
+  state.paused = keepMenuOpen;
+  state.menuStatus = 'Ready to deploy';
+  state.menuMessage =
+    'Survive 3 nights on each sky island, defend the crown, and unlock shrine tech to empower towers.';
+  state.menuStartLabel = keepMenuOpen ? 'Start run' : 'Resume run';
+  state.hudText = '';
+  state.waveTimer = 0;
+  state.waveInterval = 0;
+  state.currentNightNumber = null;
+  state.enemies = [];
+  state.projectiles = [];
+  state.skyBlend = 0;
+  state.effects = createEffectsState();
+}
+
+function rebuildStructures(store) {
+  const widthRatio = store.world.width / store.baseWorld.width;
+  [store.walls[0], store.walls[1]].forEach((wall, idx) => {
+    const pos = store.baseWorld.walls[idx] * widthRatio;
+    const resetWall = createWall(pos, store.world, store.state.modifiers);
+    Object.assign(wall, resetWall);
+    wall.x = clamp(wall.x, 0, store.world.width - wall.w);
+    wall.y = store.world.ground - wall.h;
+  });
+  [store.towers[0], store.towers[1]].forEach((tower, idx) => {
+    const pos = store.baseWorld.towers[idx] * widthRatio;
+    const resetTower = createTower(pos, store.world, store.state.modifiers);
+    Object.assign(tower, resetTower);
+    tower.x = clamp(tower.x, 0, store.world.width - tower.w);
+    tower.y = store.world.ground - tower.h;
+  });
+}
+
+function assignIsland(store, level, { keepHistory = false } = {}) {
+  const history = keepHistory ? store.state.islandHistory || [] : [];
+  const islandContext = createIslandContext(level, history);
+  store.state.islandLevel = level;
+  store.state.islandHistory = [...history, islandContext.bonus?.id].filter(Boolean);
+  store.state.island = islandContext;
+  store.state.modifiers = islandContext.modifiers || { ...DEFAULT_MODIFIERS };
+  store.state.altitude = (level - 1) * (BASE_WORLD.altitudeStep || 24);
+}
+
+export function resetGameStore(store, options = {}) {
+  const { keepLearnedUpgrades = false, islandLevel = 1 } = options;
+  assignIsland(store, islandLevel, { keepHistory: keepLearnedUpgrades && islandLevel > 1 });
+
+  applyAltitude(store);
+  resetRunState(store.state, store.state.modifiers, { keepMenuOpen: false });
+
+  store.state.shrineUnlocked =
+    (keepLearnedUpgrades && store.state.learnedShrine) || store.state.modifiers.shrineUnlocked;
+  store.state.learnedShrine = store.state.shrineUnlocked;
+  store.state.menuStatus = `Island ${islandLevel}`;
+  store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${
+    store.state.island?.bonus?.description || 'Hold the line for three nights.'
+  }`;
   store.state.menuStartLabel = 'Start run';
-  store.state.shrineUnlocked = false;
-  store.state.hudText = '';
-  store.state.waveTimer = 0;
-  store.state.waveInterval = 0;
-  store.state.currentNightNumber = null;
-  store.state.enemies = [];
-  store.state.projectiles = [];
-  store.state.skyBlend = 0;
-  store.state.effects = createEffectsState();
 
   resetInputState(store.input);
 
@@ -93,21 +159,36 @@ export function resetGameStore(store) {
   store.player.x = Math.min(freshPlayer.x, store.world.width - store.player.w - 40);
   store.player.y = freshPlayer.y;
 
-  const widthRatio = store.world.width / store.baseWorld.width;
-  [store.walls[0], store.walls[1]].forEach((wall, idx) => {
-    const pos = store.baseWorld.walls[idx] * widthRatio;
-    const resetWall = createWall(pos, store.world);
-    Object.assign(wall, resetWall);
-    wall.x = clamp(wall.x, 0, store.world.width - wall.w);
-    wall.y = store.world.ground - wall.h;
-  });
-  [store.towers[0], store.towers[1]].forEach((tower, idx) => {
-    const pos = store.baseWorld.towers[idx] * widthRatio;
-    const resetTower = createTower(pos, store.world);
-    Object.assign(tower, resetTower);
-    tower.x = clamp(tower.x, 0, store.world.width - tower.w);
-    tower.y = store.world.ground - tower.h;
-  });
+  rebuildStructures(store);
+  store.shrine.x = store.world.width / 2 - store.shrine.w / 2;
+  store.shrine.y = store.world.ground - store.shrine.h;
+  resizeCamera(store.camera, store.camera.w, store.camera.h, store.world);
+  centerCameraOnPlayer(store.camera, store.player, store.world);
+}
+
+export function ascendGameStore(store) {
+  const nextLevel = (store.state.islandLevel || 1) + 1;
+  assignIsland(store, nextLevel, { keepHistory: true });
+  applyAltitude(store);
+  resetRunState(store.state, store.state.modifiers, { keepMenuOpen: true });
+  store.state.pendingAscend = false;
+  store.state.shrineUnlocked = store.state.learnedShrine || store.state.modifiers.shrineUnlocked;
+  store.state.learnedShrine = store.state.shrineUnlocked;
+  store.state.menuStatus = `Ascended to Island ${nextLevel}`;
+  store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${
+    store.state.island?.bonus?.description || ''
+  }`;
+  store.state.menuStartLabel = 'Begin next island';
+
+  resetInputState(store.input);
+  const freshPlayer = createPlayer(store.world);
+  Object.assign(store.player, freshPlayer);
+  store.player.x = Math.min(freshPlayer.x, store.world.width - store.player.w - 40);
+  store.player.y = freshPlayer.y;
+
+  rebuildStructures(store);
+  store.shrine.x = store.world.width / 2 - store.shrine.w / 2;
+  store.shrine.y = store.world.ground - store.shrine.h;
   resizeCamera(store.camera, store.camera.w, store.camera.h, store.world);
   centerCameraOnPlayer(store.camera, store.player, store.world);
 }
@@ -120,8 +201,9 @@ export function updateWorldDimensions(store, width, height) {
 
   store.world.width = scaledWidth;
   store.world.height = scaledHeight;
+  const altitude = (store.state?.altitude || 0) * WORLD_SCALE.y;
   const groundMargin = store.baseWorld.groundMargin * heightRatio;
-  store.world.ground = Math.max(scaledHeight - groundMargin, scaledHeight * 0.6);
+  store.world.ground = Math.max(scaledHeight - groundMargin - altitude, scaledHeight * 0.48);
 
   store.walls.forEach((wall, idx) => {
     const baseX = (store.baseWorld.walls || [])[idx];
@@ -146,7 +228,13 @@ export function updateWorldDimensions(store, width, height) {
   store.player.y = Math.min(store.player.y, store.world.ground - store.player.h);
   store.state.enemies.forEach((enemy) => {
     enemy.x = clamp(enemy.x, -140, store.world.width + 140);
-    enemy.y = Math.min(enemy.y, store.world.ground - enemy.h);
+    const targetGround = store.world.ground - enemy.h;
+    if (enemy.carrier?.active && !enemy.carrier?.hasDropped) {
+      const hover = enemy.carrier.height || targetGround - 100;
+      enemy.y = Math.min(enemy.y, hover);
+    } else {
+      enemy.y = Math.min(enemy.y, targetGround);
+    }
   });
   resizeCamera(store.camera, width, height, store.world);
   centerCameraOnPlayer(store.camera, store.player, store.world);

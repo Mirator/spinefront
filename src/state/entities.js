@@ -27,19 +27,23 @@ export function createPlayer(world) {
   };
 }
 
-export function createWall(x, world) {
+export function createWall(x, world, modifiers = {}) {
+  const wallScale = modifiers.wallHp || 1;
+  const maxHp = Math.round(120 * wallScale);
   return {
     type: 'wall',
     x,
     y: world.ground - 60,
     w: 40,
     h: 60,
-    hp: 120,
-    maxHp: 120,
+    hp: maxHp,
+    maxHp,
   };
 }
 
-export function createTower(x, world) {
+export function createTower(x, world, modifiers = {}) {
+  const fireRateScale = modifiers.towerFireRate || 1;
+  const damageScale = modifiers.projectileDamage || 1;
   return {
     type: 'tower',
     x,
@@ -48,8 +52,9 @@ export function createTower(x, world) {
     h: 90,
     hp: 160,
     maxHp: 160,
-    fireRate: 1.4,
+    fireRate: 1.4 * fireRateScale,
     fireTimer: 0,
+    damageMultiplier: damageScale,
   };
 }
 
@@ -63,24 +68,54 @@ export function createShrine(world) {
   };
 }
 
-export function createEnemy(side, world) {
-  const spawnPadding = 80;
+export function createEnemy(side, world, towers = [], modifiers = {}) {
+  const spawnPadding = 120;
   const x = side === 'left' ? -spawnPadding : world.width + spawnPadding;
+  const speedScale = modifiers.enemySpeed || 1;
+  const hpScale = modifiers.enemyHp || 1;
+  const wyvernScale = modifiers.wyvernSpeed || 1;
+  const baseSpeed = 65 * speedScale;
+  const dropTarget = pickDropTarget(side, world, towers, modifiers.dropPadding || 0);
+  const carrier = {
+    active: true,
+    hasDropped: false,
+    targetX: dropTarget,
+    speedMultiplier: 4 * wyvernScale,
+    height: world.ground - 140,
+    dropDuration: 0.35,
+    dropTimer: 0,
+  };
   return {
     type: 'enemy',
     x,
-    y: world.ground - 36,
+    y: world.ground - 140,
     w: 28,
     h: 36,
-    vx: side === 'left' ? 65 : -65,
-    speed: 65,
+    vx: side === 'left' ? baseSpeed : -baseSpeed,
+    speed: baseSpeed,
     attack: 12,
     attackRate: 1,
     attackTimer: 0,
     stunTimer: 0,
     target: null,
-    hp: 50,
+    hp: Math.round(50 * hpScale),
+    maxHp: Math.round(50 * hpScale),
+    carrier,
   };
+}
+
+function pickDropTarget(side, world, towers = [], dropPadding = 0) {
+  const living = towers.filter((t) => t.hp > 0);
+  const fallback = side === 'left' ? world.width * 0.35 : world.width * 0.65;
+  if (!living.length) return fallback;
+  const preferred = living.reduce((closest, tower) => {
+    if (!closest) return tower;
+    const center = tower.x + tower.w / 2;
+    const bestCenter = closest.x + closest.w / 2;
+    return Math.abs(center - fallback) < Math.abs(bestCenter - fallback) ? tower : closest;
+  }, null);
+  const center = preferred.x + preferred.w / 2;
+  return center + (side === 'left' ? -24 : 24) + (side === 'left' ? dropPadding : -dropPadding);
 }
 
 export function scalePositions(world, baseWorld = { width: 960 }) {
@@ -91,11 +126,11 @@ export function scalePositions(world, baseWorld = { width: 960 }) {
   };
 }
 
-export function createStructureSets(world, baseWorld) {
+export function createStructureSets(world, baseWorld, modifiers = {}) {
   const { walls, towers } = scalePositions(world, baseWorld);
   return {
-    walls: walls.map((pos) => createWall(pos, world)),
-    towers: towers.map((pos) => createTower(pos, world)),
+    walls: walls.map((pos) => createWall(pos, world, modifiers)),
+    towers: towers.map((pos) => createTower(pos, world, modifiers)),
     shrine: createShrine(world),
   };
 }
