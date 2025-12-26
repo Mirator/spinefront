@@ -121,7 +121,7 @@ function updateCarrier(enemy, world, dt) {
   return true;
 }
 
-function dropEnemy(enemy, world, dt) {
+function dropEnemy(enemy, world, dt, rng) {
   const carrier = enemy.carrier;
   if (!carrier || carrier.dropTimer <= 0 || carrier.hasDropped === false) return false;
   carrier.dropTimer = Math.max(0, carrier.dropTimer - dt);
@@ -131,17 +131,20 @@ function dropEnemy(enemy, world, dt) {
   enemy.y = startY + (targetY - startY) * Math.min(1, t);
   if (carrier.dropTimer <= 0) {
     enemy.y = targetY;
-    enemy.vx = enemy.vx === 0 ? enemy.speed * (Math.random() > 0.5 ? 1 : -1) : enemy.vx;
+    if (enemy.vx === 0) {
+      const direction = rng?.boolean?.() ?? Math.random() > 0.5;
+      enemy.vx = enemy.speed * (direction ? 1 : -1);
+    }
   }
   return true;
 }
 
-export function resolveEnemyAttacks(enemies, targets, world, dt) {
+export function resolveEnemyAttacks(enemies, targets, world, dt, rng) {
   const events = [];
   enemies.forEach((e) => {
     if (e.hp <= 0) return;
     if (updateCarrier(e, world, dt)) return;
-    if (dropEnemy(e, world, dt)) return;
+    if (dropEnemy(e, world, dt, rng)) return;
     if (e.stunTimer > 0) {
       e.stunTimer = Math.max(0, e.stunTimer - dt);
       e.x += e.vx * dt;
@@ -222,7 +225,7 @@ export function updateTowers(towers, enemies, projectiles, shrineUnlocked, dt) {
   return firings;
 }
 
-export function updateProjectiles(projectiles, enemies, world, effects, dt) {
+export function updateProjectiles(projectiles, enemies, world, effects, dt, rng) {
   const remaining = [];
   const hits = [];
   projectiles.forEach((p) => {
@@ -246,7 +249,14 @@ export function updateProjectiles(projectiles, enemies, world, effects, dt) {
       applyDamage(hitEnemy, next.damage);
       hits.push({ projectile: next, enemy: hitEnemy });
       if (effects) {
-        addHitFlash(effects, hitEnemy.x + hitEnemy.w / 2, hitEnemy.y + hitEnemy.h / 2, world.width, world.height);
+        addHitFlash(
+          effects,
+          hitEnemy.x + hitEnemy.w / 2,
+          hitEnemy.y + hitEnemy.h / 2,
+          world.width,
+          world.height,
+          rng,
+        );
         triggerScreenShake(effects, 2.2, 0.12);
       }
     } else if (

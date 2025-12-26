@@ -50,7 +50,13 @@ describe('game logic systems', () => {
     const store = createGameStore();
     store.state.isNight = true;
     store.state.waveTimer = 0;
-    const spawned = updateEnemySpawns(store.state, store.world, (side) => createEnemy(side, store.world), 0.1);
+    const spawned = updateEnemySpawns(
+      store.state,
+      store.world,
+      (side) => createEnemy(side, store.world),
+      0.1,
+      store.rng,
+    );
     expect(spawned.length).toBe(1);
     expect(store.state.waveTimer).toBeGreaterThan(0);
   });
@@ -64,7 +70,7 @@ describe('game logic systems', () => {
     enemy.attackTimer = 0;
     store.state.enemies.push(enemy);
 
-    const events = resolveEnemyAttacks(store.state.enemies, [store.walls[0]], store.world, 1);
+    const events = resolveEnemyAttacks(store.state.enemies, [store.walls[0]], store.world, 1, store.rng);
     expect(store.walls[0].hp).toBeLessThan(store.walls[0].maxHp);
     expect(events.some((e) => e.type === 'structureHit')).toBe(true);
   });
@@ -193,7 +199,7 @@ describe('game logic systems', () => {
       color: '#fff',
     };
 
-    const result = updateProjectiles([projectile], store.state.enemies, store.world, null, 0.1);
+    const result = updateProjectiles([projectile], store.state.enemies, store.world, null, 0.1, store.rng);
     expect(result.remaining.length).toBe(0);
     expect(enemy.hp).toBe(40);
   });
@@ -221,15 +227,15 @@ describe('game logic systems', () => {
     state.waveTimer = 0;
     const expectedInterval = state.waveInterval;
 
-    const firstWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), 0);
+    const firstWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), 0, store.rng);
     expect(firstWave).toHaveLength(1);
     expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
 
-    const secondWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval);
+    const secondWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval, store.rng);
     expect(secondWave).toHaveLength(1);
     expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
 
-    const thirdWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval);
+    const thirdWave = updateEnemySpawns(state, world, (side) => createEnemy(side, world), expectedInterval, store.rng);
     expect(thirdWave).toHaveLength(1);
     expect(state.waveInterval).toBeCloseTo(expectedInterval, 5);
     expect(state.waveTimer).toBeCloseTo(expectedInterval, 5);
