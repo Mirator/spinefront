@@ -117,7 +117,7 @@ function pickDropTarget(side, world, towers = [], dropPadding = 0) {
     return Math.abs(center - fallback) < Math.abs(bestCenter - fallback) ? tower : closest;
   }, null);
   const center = preferred.x + preferred.w / 2;
-  return center + (side === 'left' ? -24 : 24) + (side === 'left' ? dropPadding : -dropPadding);
+  return center + (side === 'left' ? -48 : 48) + (side === 'left' ? dropPadding : -dropPadding);
 }
 
 export function scalePositions(world, baseWorld = { width: 960 }) {

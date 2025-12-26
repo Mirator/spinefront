@@ -23,8 +23,8 @@ export const ECONOMY = {
 };
 
 export const BASE_POSITIONS = {
-  walls: [448, 512],
-  towers: [463, 497],
+  walls: [432, 528],
+  towers: [454, 506],
   player: 468,
 };
 
