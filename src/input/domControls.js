@@ -144,6 +144,7 @@ function bindTouchControl(config, isEnded, isMenuOpen = () => false) {
 function bindVirtualJoystick({ id, onMove, onEnd, isEnded = () => false, isMenuOpen = () => false }) {
   const el = document.getElementById(id);
   if (!el) return () => {};
+  const indicator = el.querySelector('.joystick-indicator');
 
   const threshold = 18;
   const resetDirections = () => {
@@ -153,6 +154,21 @@ function bindVirtualJoystick({ id, onMove, onEnd, isEnded = () => false, isMenuO
   let active = false;
   let startX = 0;
   let startY = 0;
+  const clamp = (value, maxAbs) => Math.max(-maxAbs, Math.min(value, maxAbs));
+  const updateIndicator = (dx, dy) => {
+    if (!indicator) return;
+    const indicatorRadius = indicator.clientWidth / 2;
+    const maxOffset = Math.max(24, (Math.min(el.clientWidth, el.clientHeight) / 2) - indicatorRadius);
+    const x = clamp(dx, maxOffset);
+    const y = clamp(dy, maxOffset);
+    indicator.style.transition = 'none';
+    indicator.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  };
+  const resetIndicator = () => {
+    if (!indicator) return;
+    indicator.style.transition = 'transform 150ms ease-out';
+    indicator.style.transform = 'translate3d(0, 0, 0)';
+  };
 
   const updateFromDelta = (dx, dy) => {
     const dir = {
@@ -161,6 +177,7 @@ function bindVirtualJoystick({ id, onMove, onEnd, isEnded = () => false, isMenuO
       up: dy < -threshold,
       down: dy > threshold,
     };
+    updateIndicator(dx, dy);
     if (typeof onMove === 'function') onMove(dir);
   };
 
@@ -173,6 +190,7 @@ function bindVirtualJoystick({ id, onMove, onEnd, isEnded = () => false, isMenuO
     startY = point.clientY;
     active = true;
     el.classList.add('pressed');
+    resetIndicator();
     updateFromDelta(0, 0);
   };
 
@@ -195,6 +213,7 @@ function bindVirtualJoystick({ id, onMove, onEnd, isEnded = () => false, isMenuO
     active = false;
     el.classList.remove('pressed');
     resetDirections();
+    resetIndicator();
   };
 
   el.addEventListener('touchstart', handleStart, { passive: false });
