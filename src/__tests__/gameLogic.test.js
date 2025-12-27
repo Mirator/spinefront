@@ -283,14 +283,19 @@ describe('game logic systems', () => {
     expect(player.aura).toBeGreaterThan(auraAfterHit);
   });
 
-  it('falls after another hit when in a critical state', () => {
+  it('loses the run immediately when aura hits zero', () => {
     const store = createGameStore();
-    const { player, state } = store;
-    player.aura = 0;
-    player.critical = true;
+    const { player, state, world, baseWorld } = store;
+    player.aura = 10;
 
     applyPlayerAuraHit(player, state);
+    expect(player.aura).toBe(0);
     expect(state.playerFallen).toBe(true);
+    expect(state.lossReason).toBe('aura');
+
+    // Run an update tick to propagate the loss into menu labels.
+    updateAuraRecovery(player, state, baseWorld, world, 0.1);
+    checkEndConditions(state, world);
   });
 
   it('derives shorter wave intervals on later nights', () => {
