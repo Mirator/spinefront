@@ -73,7 +73,13 @@ export function describeMenuState(stateValue, context = {}) {
     flags.hasStarted = true;
   } else if (stateValue === MENU_STATES.ENDED) {
     labels.menuStatus = 'Run complete';
-    labels.menuMessage = END_MESSAGE;
+    if (context.lossReason === 'aura') {
+      labels.menuMessage = 'Defeat: Your aura was extinguished.';
+    } else if (context.lossReason === 'crown') {
+      labels.menuMessage = 'Defeat: The crown was lost to the horde.';
+    } else {
+      labels.menuMessage = END_MESSAGE;
+    }
     labels.menuStartLabel = 'Start run';
     flags.ended = true;
     flags.hasStarted = true;

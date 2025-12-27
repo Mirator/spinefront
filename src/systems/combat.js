@@ -358,6 +358,7 @@ export function updateCrownDrop(state, dt) {
   state.droppedCrown.timer = Math.max(0, state.droppedCrown.timer - dt);
   if (state.droppedCrown.timer <= 0 && !state.crownLost) {
     state.crownLost = true;
+    state.lossReason = 'crown';
   }
 }
 

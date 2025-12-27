@@ -44,6 +44,7 @@ export function createGameStore(dimensions = {}) {
     currency: ECONOMY.dayIncome,
     crownLost: false,
     playerFallen: false,
+    lossReason: null,
     ended: false,
     hasStarted: false,
     menuOpen: true,
@@ -109,6 +110,7 @@ function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
   state.currency = ECONOMY.dayIncome + (modifiers.incomeBonus || 0);
   state.crownLost = false;
   state.playerFallen = false;
+  state.lossReason = null;
   state.ended = false;
   state.pendingAscend = false;
   state.hasStarted = !keepMenuOpen;

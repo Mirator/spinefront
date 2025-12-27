@@ -43,13 +43,10 @@ export function applyPlayerAuraHit(player, state) {
   player.aura = nextAura;
 
   if (player.aura <= 0) {
-    if (player.critical) {
-      state.playerFallen = true;
-      state.hudText = 'You were struck again and fell into the clouds!';
-    } else {
-      player.critical = true;
-      state.hudText = 'Critical! Reach safety before the next hit.';
-    }
+    state.playerFallen = true;
+    state.lossReason = 'aura';
+    state.hudText = 'Aura extinguished — you fall into the clouds.';
+    player.critical = true;
   }
 
   return true;
