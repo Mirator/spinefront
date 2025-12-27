@@ -1,4 +1,4 @@
-import { AURA, COLORS, ECONOMY, SHRINE_TECH } from '../core/constants.js';
+import { AURA, COLORS, ECONOMY, GOLD_BURDEN, SHRINE_TECH } from '../core/constants.js';
 import { createRng } from '../core/random.js';
 import { clamp, hexToRgb, lerpColor } from '../systems/math.js';
 
@@ -144,28 +144,6 @@ export function createRenderer({ canvas, colors = COLORS }) {
       4,
     );
     ctx.fill();
-
-    if (player.crown) {
-      const crownBase = colors.crown;
-      const crownX = bodyX + bodyW / 2 - 12;
-      const crownY = bodyY - 12;
-      ctx.fillStyle = shadeColor(crownBase, -0.1);
-      drawRoundedRect(ctx, crownX, crownY + 6, 24, 8, 3);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(crownX, crownY + 8);
-      ctx.lineTo(crownX + 6, crownY);
-      ctx.lineTo(crownX + 12, crownY + 8);
-      ctx.lineTo(crownX + 18, crownY);
-      ctx.lineTo(crownX + 24, crownY + 8);
-      ctx.closePath();
-      ctx.fillStyle = crownBase;
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.beginPath();
-      ctx.arc(crownX + 12, crownY + 6, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
 
@@ -462,33 +440,44 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
-  function drawDroppedCrown(drop) {
-    if (!drop?.active) return;
-    ctx.save();
-    const base = colors.crown;
-    ctx.fillStyle = shadeColor(base, -0.1);
-    const x = drop.x;
-    const y = drop.y;
-    drawRoundedRect(ctx, x - 12, y - 6, 24, 10, 3);
-    ctx.fill();
-    ctx.fillStyle = base;
-    ctx.beginPath();
-    ctx.moveTo(x - 12, y - 2);
-    ctx.lineTo(x - 6, y - 12);
-    ctx.lineTo(x, y - 2);
-    ctx.lineTo(x + 6, y - 12);
-    ctx.lineTo(x + 12, y - 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath();
-    ctx.arc(x, y - 4, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#fef3c7';
-    ctx.font = '10px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${drop.timer.toFixed(1)}s`, x, y + 14);
-    ctx.restore();
+  function drawJumpPuzzles(puzzles = [], activePuzzle, camera, world) {
+    if (!puzzles?.length || !world) return;
+    puzzles.forEach((puzzle) => {
+      const status = puzzle.state;
+      const base =
+        status === 'completed' || status === 'resolved'
+          ? '#34d399'
+          : status === 'failed'
+            ? '#f87171'
+            : colors.beacon;
+      const x = puzzle.x - 10;
+      const topY = world.ground - 120;
+      const height = 110;
+      ctx.save();
+      ctx.fillStyle = shadeColor(base, -0.2);
+      drawRoundedRect(ctx, x + 4, topY + 8, 12, height, 6);
+      ctx.fill();
+      ctx.fillStyle = base;
+      drawRoundedRect(ctx, x, topY, 12, height, 8);
+      ctx.fill();
+      if (activePuzzle?.id === puzzle.id) {
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath();
+        ctx.arc(x + 6, topY - 12, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#0b1120';
+      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      const label =
+        status === 'completed' || status === 'resolved'
+          ? 'Cleared'
+          : status === 'failed'
+            ? 'Failed'
+            : 'Puzzle';
+      ctx.fillText(label, x + 6, topY + height + 10);
+      ctx.restore();
+    });
   }
 
   function drawCelestials(state, world, camera) {
@@ -597,11 +586,15 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const nextCost = nextTier === 1 ? Math.max(baseNextCost, ECONOMY.shrineCost) : baseNextCost;
     const auraMax = player.maxAura || AURA.max;
     const auraPercent = Math.round(clamp((player.aura ?? auraMax) / auraMax, 0, 1) * 100);
+    const burdenRatio = clamp(state.burdenRatio || 0, 0, 1);
+    const sprintSlow = Math.round(burdenRatio * GOLD_BURDEN.maxSprintSlow * 100);
+    const instabilityGold = Math.max(0, (state.currency || 0) - AURA.instabilityGoldFloor);
     const hudLines = [
       `Island ${state.islandLevel || 1}: ${islandName}`,
       `Nights: ${state.nightsSurvived}/${world.nightsToWin}`,
-      `Gold: ${state.currency}`,
-      `Aura: ${auraPercent}%${player.critical ? ' (critical!)' : ''}`,
+      `Gold: ${state.currency} (burden -${sprintSlow}% sprint${instabilityGold > 0 ? ', aura shaky' : ''})`,
+      `Legacy: ${state.legacy || 0}`,
+      `Aura: ${auraPercent}%${player.critical ? ' (critical!)' : ''} — recover inside walls with ${AURA.recoveryGoldThreshold}+ gold.`,
     ];
     if (state.island?.bonus?.description) {
       hudLines.push(`Bonus: ${state.island.bonus.description}`);
@@ -615,8 +608,22 @@ export function createRenderer({ canvas, colors = COLORS }) {
     if (!state.isNight) {
       hudLines.push(`Day build: Repair (-${ECONOMY.repairCost}) near walls/towers or E+↓ for barricade (-${ECONOMY.barricadeCost}).`);
     }
-    if (state.droppedCrown?.active) {
-      hudLines.push(`Crown dropped! ${state.droppedCrown.timer.toFixed(1)}s to recover.`);
+    if (state.jumpPuzzles?.length) {
+      const cleared = state.jumpPuzzles.filter((p) => p.state === 'completed' || p.state === 'resolved').length;
+      const available = state.jumpPuzzles.filter((p) => p.state === 'available').length;
+      hudLines.push(`Jump puzzles: ${cleared}/${state.jumpPuzzles.length} cleared, ${available} waiting (daytime only).`);
+      if (state.activePuzzle) {
+        const remaining = Math.max(0, state.activePuzzle.timer || 0).toFixed(1);
+        hudLines.push(`Puzzle climb: ${state.activePuzzle.jumpsDone}/${state.activePuzzle.requiredJumps} jumps — ${remaining}s left.`);
+      }
+      if (state.pendingPuzzleReward) {
+        hudLines.push(
+          `Puzzle reward ready: ${state.puzzleRewardSelection} (up/down to switch, interact near beacon to claim).`,
+        );
+      }
+    }
+    if (burdenRatio > 0.4) {
+      hudLines.push('Gold is heavy — drop some (Interact+↓) to calm your aura.');
     }
     if (state.isNight && state.waveDescriptors?.length) {
       const preview = state.waveDescriptors.slice(0, 3);
@@ -660,7 +667,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = 'rgba(229, 231, 235, 0.9)';
     const text =
-      'Move: A/D or ←/→ | Jump: Space | Ladder: W/S or ↑/↓ | Sprint: Shift | Attack: F | Interact/Build: E (E+↓ for barricade) | Restart: R | Menu: Esc';
+      'Move: A/D or ←/→ | Jump: Space | Ladder: W/S or ↑/↓ | Sprint: Shift | Attack: F | Interact/Build/Drop: E (E+↓ for barricade or gold drop) | Restart: R | Menu: Esc';
     ctx.fillText(text, canvas.width / 2, canvas.height - 12);
     ctx.restore();
   }
@@ -711,7 +718,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const panelWidth = Math.min(520, canvas.width - 40);
-    const panelHeight = 260;
+    const panelHeight = 380;
     const panelX = (canvas.width - panelWidth) / 2;
     const panelY = (canvas.height - panelHeight) / 2;
 
@@ -733,7 +740,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
 
     ctx.fillStyle = '#9ca3af';
     ctx.font = '14px Inter, system-ui, sans-serif';
-    const message = state.menuMessage || 'Survive 3 nights, defend the crown, and unlock the shrine.';
+    const message = state.menuMessage || 'Survive 3 nights, manage your aura burden, and unlock the shrine.';
     ctx.fillText(message, panelX + 18, panelY + 64);
 
     if (state.island?.bonus?.name) {
@@ -750,7 +757,9 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const items = [
       'Endure 3 nights to ascend to the next sky island.',
       'Keep walls and towers standing to slow the corruption.',
-      'Carry gold and stand within your walls to recover your light aura.',
+      'Gold fuels aura recovery but slows sprinting and destabilizes aura when hoarded.',
+      'Interact + Down drops gold to shed burden; hold enough to heal within your walls.',
+      'Optional jump puzzles sit off the lane — they eat daylight but grant gold, relics, or legacy.',
       shrineHelpCopy(),
       'Income arrives at dawn (+10) and at the start of each night (+5), plus any island bonus.',
       `Daytime: repair walls/towers (Interact) or place barricades with Interact+Down.`,
@@ -781,8 +790,9 @@ export function createRenderer({ canvas, colors = COLORS }) {
       'Mobile: Drag left pad to move/up/down',
       'Mobile: Right buttons: Jump / Attack / Interact',
     ];
+    const actionsStartY = panelY + 110 + items.length * 18 + 12;
     actions.forEach((line, idx) => {
-      ctx.fillText(line, panelX + 18, panelY + 178 + idx * 18);
+      ctx.fillText(line, panelX + 18, actionsStartY + idx * 18);
     });
     ctx.restore();
   }
@@ -792,16 +802,12 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const lossColor = state.crownLost || state.playerFallen ? '#f87171' : '#34d399';
+    const lossColor = state.playerFallen ? '#f87171' : '#34d399';
     ctx.fillStyle = lossColor;
     ctx.font = '28px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const message = state.crownLost
-      ? 'Crown lost! You were overrun.'
-      : state.playerFallen
-        ? 'You fell into the clouds.'
-        : 'Victory! Dawn rises and you endure.';
+    const message = state.playerFallen ? 'Aura collapsed — you were cast from the island.' : 'Victory! Dawn rises and you endure.';
     ctx.fillText(message, canvas.width / 2, canvas.height / 2);
     ctx.font = '16px Inter, system-ui, sans-serif';
     ctx.fillStyle = '#e5e7eb';
@@ -948,10 +954,10 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.translate(-activeCamera.x, -activeCamera.y);
     drawShrine(shrine, state.shrineUnlocked);
     drawStructures(walls, towers, barricades);
+    drawJumpPuzzles(state.jumpPuzzles, state.activePuzzle, activeCamera, world);
     drawEnemies(enemies);
     drawProjectiles(projectiles);
     drawProjectiles(enemyProjectiles);
-    drawDroppedCrown(state.droppedCrown);
     drawPlayer(player);
     drawPlayerAttack(player);
     drawHitFlashes(state.effects, world);

@@ -52,10 +52,6 @@ export function checkEndConditions(state, world) {
     state.ended = true;
     return 'loss';
   }
-  if (state.crownLost) {
-    state.ended = true;
-    return 'loss';
-  }
   if (!state.isNight && state.nightsSurvived >= world.nightsToWin) {
     state.pendingAscend = true;
     state.paused = true;

@@ -31,9 +31,23 @@ export const AURA = {
   recoverDelay: 1.1,
   recoverRate: 12,
   recoveryGoldThreshold: 4,
-  criticalRecoveryBuffer: 6,
+  criticalRecoveryBuffer: 8,
   territoryPadding: 80,
   goldDropPerHit: 3,
+  burdenHitBonus: 0.4,
+  instabilityGoldFloor: 8,
+  instabilityGoldCeiling: 16,
+  instabilityDelayPerGold: 0.06,
+  instabilityDrainPerGold: 0.14,
+  recoverBurdenPenalty: 0.03,
+};
+
+export const GOLD_BURDEN = {
+  freeLoad: 4,
+  slowSoftCap: 14,
+  maxWalkSlow: 0.18,
+  maxSprintSlow: 0.45,
+  manualDropAmount: 5,
 };
 
 export const SHRINE_TECH = {
@@ -69,9 +83,20 @@ export const COLORS = {
   enemy: '#ff9aa2',
   sapper: '#fb923c',
   shrine: '#7de3c5',
-  crown: '#fcd34d',
   beacon: '#f472b6',
   wyvern: '#9ca3af',
   islandTop: '#4ade80',
   islandShadow: '#115e3d',
+};
+
+export const PUZZLES = {
+  count: 2,
+  interactionRange: 48,
+  requiredJumps: 3,
+  timeLimit: 12,
+  timeCostMultiplier: 1.6,
+  failTimePenalty: 6,
+  goldReward: 8,
+  legacyReward: 1,
+  relicOptions: ['steady_aura', 'lightfoot', 'damping_field'],
 };

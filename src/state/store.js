@@ -6,6 +6,7 @@ import { clamp } from '../systems/math.js';
 import { createBarricade, createPlayer, createStructureSets, createWall, createTower } from './entities.js';
 import { centerCameraOnPlayer, createCamera, resizeCamera } from './camera.js';
 import { createBaseModifiers, createIslandContext } from './islands.js';
+import { resetJumpPuzzles } from '../systems/puzzles.js';
 
 function applyAltitude(store) {
   const heightRatio = store.world.height / store.baseWorld.height;
@@ -42,7 +43,6 @@ export function createGameStore(dimensions = {}) {
     isNight: false,
     nightsSurvived: 0,
     currency: ECONOMY.dayIncome,
-    crownLost: false,
     playerFallen: false,
     lossReason: null,
     ended: false,
@@ -79,13 +79,21 @@ export function createGameStore(dimensions = {}) {
     pendingAscend: false,
     altitude: 0,
     randomSeed: rng.seed,
-    droppedCrown: { active: false, x: 0, y: 0, timer: 0 },
     interactionLatch: false,
     waveDescriptors: [],
+    relics: [],
+    relicModifiers: { auraRecovery: 0, sprintResist: 0, instabilityResist: 0 },
+    legacy: 0,
+    jumpPuzzles: [],
+    activePuzzle: null,
+    pendingPuzzleReward: null,
+    puzzleRewardSelection: 'gold',
+    puzzleSelectionHeld: false,
   };
 
   state.shrineUnlocked = state.learnedShrine || false;
   state.shrineTech.unlocked = state.shrineUnlocked;
+  resetJumpPuzzles(state, world);
 
   return {
     baseWorld: { ...BASE_WORLD, walls: [...BASE_POSITIONS.walls], towers: [...BASE_POSITIONS.towers] },
@@ -102,13 +110,12 @@ export function createGameStore(dimensions = {}) {
   };
 }
 
-function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
+function resetRunState(state, modifiers, world, { keepMenuOpen = false } = {}) {
   state.time = 0;
   state.dayTimer = 0;
   state.isNight = false;
   state.nightsSurvived = 0;
   state.currency = ECONOMY.dayIncome + (modifiers.incomeBonus || 0);
-  state.crownLost = false;
   state.playerFallen = false;
   state.lossReason = null;
   state.ended = false;
@@ -118,7 +125,7 @@ function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
   state.paused = keepMenuOpen;
   state.menuStatus = 'Ready to deploy';
   state.menuMessage =
-    'Survive 3 nights on each sky island, defend the crown, and unlock shrine tech to empower towers.';
+    'Survive 3 nights on each sky island, keep your aura lit, and spend or drop gold to stay nimble.';
   state.menuStartLabel = keepMenuOpen ? 'Start run' : 'Resume run';
   state.hudText = '';
   state.waveTimer = 0;
@@ -130,9 +137,16 @@ function resetRunState(state, modifiers, { keepMenuOpen = false } = {}) {
   state.enemyProjectiles = [];
   state.skyBlend = 0;
   state.effects = createEffectsState();
-  state.droppedCrown = { active: false, x: 0, y: 0, timer: 0 };
   state.waveDescriptors = [];
   state.interactionLatch = false;
+  state.relics = [];
+  state.relicModifiers = { auraRecovery: 0, sprintResist: 0, instabilityResist: 0 };
+  state.jumpPuzzles = state.jumpPuzzles || [];
+  state.activePuzzle = null;
+  state.pendingPuzzleReward = null;
+  state.puzzleRewardSelection = 'gold';
+  state.puzzleSelectionHeld = false;
+  resetJumpPuzzles(state, world);
 
   state.shrineTech = {
     unlocked: state.learnedShrine || false,
@@ -188,7 +202,7 @@ export function resetGameStore(store, options = {}) {
   seedStoreRng(store, options.seed ?? store.state.randomSeed ?? Date.now());
 
   applyAltitude(store);
-  resetRunState(store.state, store.state.modifiers, { keepMenuOpen: false });
+  resetRunState(store.state, store.state.modifiers, store.world, { keepMenuOpen: false });
 
   store.state.shrineUnlocked =
     (keepLearnedUpgrades && store.state.learnedShrine) || store.state.modifiers.shrineUnlocked;
@@ -221,7 +235,7 @@ export function ascendGameStore(store) {
   assignIsland(store, nextLevel, { keepHistory: true });
   seedStoreRng(store, store.state.randomSeed ?? Date.now());
   applyAltitude(store);
-  resetRunState(store.state, store.state.modifiers, { keepMenuOpen: true });
+  resetRunState(store.state, store.state.modifiers, store.world, { keepMenuOpen: true });
   store.state.pendingAscend = false;
   store.state.shrineUnlocked = store.state.learnedShrine || store.state.modifiers.shrineUnlocked;
   store.state.learnedShrine = store.state.shrineUnlocked;
@@ -289,6 +303,13 @@ export function updateWorldDimensions(store, width, height) {
     });
   }
 
+  if (store.state.jumpPuzzles) {
+    store.state.jumpPuzzles.forEach((puzzle) => {
+      puzzle.x *= widthScale;
+      puzzle.y = store.world.ground - 48;
+    });
+  }
+
   store.shrine.x = store.world.width / 2 - store.shrine.w / 2;
   store.shrine.y = store.world.ground - store.shrine.h;
 
@@ -304,10 +325,6 @@ export function updateWorldDimensions(store, width, height) {
       enemy.y = Math.min(enemy.y, targetGround);
     }
   });
-  if (store.state.droppedCrown?.active) {
-    store.state.droppedCrown.x *= widthScale;
-    store.state.droppedCrown.y = store.world.ground - 6;
-  }
   resizeCamera(store.camera, width, height, store.world);
   centerCameraOnPlayer(store.camera, store.player, store.world);
 }
