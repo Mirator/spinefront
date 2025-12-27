@@ -1,4 +1,5 @@
 import { AURA, COLORS, ECONOMY, SHRINE_TECH } from '../core/constants.js';
+import { createRng } from '../core/random.js';
 import { clamp, hexToRgb, lerpColor } from '../systems/math.js';
 
 function drawRoundedRect(ctx, x, y, w, h, r = 12) {
@@ -853,40 +854,71 @@ export function createRenderer({ canvas, colors = COLORS }) {
     drawCloud((cloudSeed * 73 + 260) % camera.w, 200, 1.15, 0.5);
 
     ctx.save();
-    const topGradient = ctx.createLinearGradient(0, groundY - 60, 0, groundY + 90);
+    const islandSeed = (state.randomSeed || 1) ^ ((state.islandLevel || 1) * 977);
+    const islandRng = createRng(islandSeed);
+    const leftOverhang = 72 + islandRng.uniform(-18, 22);
+    const rightOverhang = 84 + islandRng.uniform(-22, 28);
+    const slabDepth = 94 + islandRng.uniform(-10, 24);
+    const stratumDepth = 134 + islandRng.uniform(-12, 26);
+
+    const topGradient = ctx.createLinearGradient(0, groundY - 70, 0, groundY + slabDepth);
     topGradient.addColorStop(0, shadeColor(islandTop, 0.18));
     topGradient.addColorStop(1, islandTop);
     ctx.fillStyle = topGradient;
     ctx.beginPath();
-    ctx.moveTo(0, groundY);
-    ctx.lineTo(camera.w, groundY);
-    ctx.lineTo(camera.w - 80, groundY + 46);
-    ctx.lineTo(camera.w - 140, groundY + 86);
-    ctx.lineTo(120, groundY + 86);
-    ctx.lineTo(52, groundY + 46);
+    const ridgeCount = 7;
+    const ridgeStep = (camera.w + leftOverhang + rightOverhang) / (ridgeCount - 1);
+    ctx.moveTo(-leftOverhang, groundY);
+    for (let i = 0; i < ridgeCount; i += 1) {
+      const ridgeX = -leftOverhang + ridgeStep * i;
+      const ridgeY = groundY + islandRng.uniform(-10, 12);
+      ctx.lineTo(ridgeX, ridgeY);
+    }
+    ctx.lineTo(camera.w + rightOverhang, groundY + slabDepth * 0.42);
+    ctx.lineTo(camera.w + rightOverhang * 0.45, groundY + slabDepth);
+    ctx.lineTo(camera.w * 0.48, groundY + slabDepth + islandRng.uniform(-6, 14));
+    ctx.lineTo(camera.w * 0.2, groundY + slabDepth * 0.9);
+    ctx.lineTo(-leftOverhang * 0.22, groundY + slabDepth * 0.5);
     ctx.closePath();
     ctx.fill();
 
     ctx.fillStyle = islandShadow;
+    const underbellyY = groundY + slabDepth * 0.74;
     ctx.beginPath();
-    ctx.moveTo(camera.w - 140, groundY + 86);
-    ctx.lineTo(camera.w - 200, groundY + 124);
-    ctx.lineTo(camera.w - 260, groundY + 150);
-    ctx.lineTo(140, groundY + 150);
-    ctx.lineTo(90, groundY + 110);
-    ctx.lineTo(120, groundY + 86);
+    ctx.moveTo(-leftOverhang * 0.1, underbellyY + islandRng.uniform(-6, 8));
+    ctx.lineTo(camera.w + rightOverhang * 0.24, underbellyY + islandRng.uniform(-4, 10));
+    ctx.lineTo(camera.w + rightOverhang * 0.1, underbellyY + stratumDepth * 0.35);
+    ctx.lineTo(camera.w * 0.64, underbellyY + stratumDepth * 0.65 + islandRng.uniform(-10, 12));
+    ctx.lineTo(camera.w * 0.32, underbellyY + stratumDepth * 0.52 + islandRng.uniform(-8, 10));
+    ctx.lineTo(-leftOverhang * 0.06, underbellyY + stratumDepth * 0.32);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = shadeColor(islandShadow, -0.05);
-    ctx.beginPath();
-    ctx.moveTo(camera.w * 0.42, groundY + 86);
-    ctx.lineTo(camera.w * 0.46, groundY + 128);
-    ctx.lineTo(camera.w * 0.5, groundY + 104);
-    ctx.lineTo(camera.w * 0.54, groundY + 138);
-    ctx.lineTo(camera.w * 0.58, groundY + 98);
-    ctx.closePath();
-    ctx.fill();
+    const columnCount = 4;
+    for (let i = 0; i < columnCount; i += 1) {
+      const center = camera.w * (0.18 + i * 0.18) + islandRng.uniform(-30, 30);
+      const width = 62 + islandRng.uniform(-12, 18);
+      const height = stratumDepth * 0.5 + islandRng.uniform(-8, 36);
+      ctx.fillStyle = shadeColor(islandShadow, i % 2 === 0 ? -0.04 : 0.06);
+      ctx.beginPath();
+      ctx.moveTo(center - width * 0.48, underbellyY + islandRng.uniform(-6, 6));
+      ctx.lineTo(center + width * 0.48, underbellyY + islandRng.uniform(-6, 6));
+      ctx.lineTo(center + width * 0.32, underbellyY + height);
+      ctx.lineTo(center - width * 0.42, underbellyY + height * 0.92);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    const debrisCount = 5 + islandRng.int(0, 2);
+    ctx.fillStyle = shadeColor(islandShadow, -0.12);
+    for (let i = 0; i < debrisCount; i += 1) {
+      const driftX = camera.w * (0.12 + 0.16 * i) + islandRng.uniform(-28, 28);
+      const driftY = underbellyY + stratumDepth * 0.9 + islandRng.uniform(-12, 22);
+      const rockWidth = 24 + islandRng.uniform(-6, 10);
+      const rockHeight = 10 + islandRng.uniform(-4, 8);
+      drawRoundedRect(ctx, driftX, driftY, rockWidth, rockHeight, 4);
+      ctx.fill();
+    }
 
     ctx.restore();
   }
