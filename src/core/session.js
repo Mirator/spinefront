@@ -12,18 +12,18 @@ import { updateCamera } from '../state/camera.js';
 import { addHitFlash, triggerSlowdown, updateEffects } from '../systems/effects.js';
 import { applyInputToPlayer, updatePlayer } from '../systems/movement.js';
 import {
-  checkCrownLoss,
+  checkPlayerContact,
   cleanupEnemies,
   resolveEnemyAttacks,
   swingSword,
   updateProjectiles,
   updateSwordCollision,
   updateTowers,
-  updateCrownDrop,
 } from '../systems/combat.js';
 import { applyPlayerAuraHit, updateAuraRecovery } from '../systems/aura.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { updateEnemySpawns } from '../systems/spawning.js';
+import { updateJumpPuzzles } from '../systems/puzzles.js';
 
 function createSnapshot(store) {
   return {
@@ -206,6 +206,7 @@ export class GameSession {
       updateSwordCollision(this.store.player, state.enemies, swordCallbacks);
     }
 
+    updateJumpPuzzles(state, this.store.player, world, scaledDt);
     updatePlayer(this.store.player, world, scaledDt, this.store.shrine);
     updateCamera(this.store.camera, this.store.player, world);
     resolveEnemyAttacks(
@@ -250,8 +251,7 @@ export class GameSession {
       this.store.rng,
       state.effects,
     );
-    checkCrownLoss(state.enemies, this.store.player, state, state.effects, handlePlayerHit);
-    updateCrownDrop(state, scaledDt);
+    checkPlayerContact(state.enemies, this.store.player, state, state.effects, handlePlayerHit);
     this.store.barricades = this.store.barricades.filter((b) => b.hp > 0);
     state.enemies = cleanupEnemies(state.enemies, world);
     updateDayNight(state, world, scaledDt);

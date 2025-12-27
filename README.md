@@ -8,9 +8,11 @@ Spinefront is a fast-paced cooperative action builder where players push a conte
 - Wave survival: enemies spawn at night from either side and target defensive structures.
 - Defenses: two walls and two towers with individual health bars; towers auto-fire at nearby enemies.
 - Shrine tech: spend 10 gold at the central shrine to increase tower fire rate.
-- Economy: earn 10 gold each sunrise and 5 gold at the start of a night.
+- Economy: earn 10 gold each sunrise and 5 gold at the start of a night while managing gold burden.
+- Aura survival: taking damage drains aura and spills gold; hitting zero puts you in a critical state where the next hit knocks you off the island.
+- Gold burden: carrying gold slows sprint speed and destabilizes aura recovery—drop it deliberately or spend it to stay mobile.
+- Optional jump puzzles: daytime climbing routes visible from the lane that trade daylight for a reward choice (gold, relic, or legacy).
 - Victory: survive **3 nights**.
-- Defeat: touch an enemy while carrying the crown (player contact drops the crown and ends the run).
 - Restart: click the HUD restart button or press **R** at any time.
 - Game menu: opens automatically on page load and can be reopened with **Esc** or the header **Menu** button. The menu pauses gameplay, lists objectives and controls, and lets you start or restart a run.
 - Responsive viewport: the canvas scales to your browser size and includes a header **Go fullscreen** toggle for an immersive layout.
@@ -67,7 +69,7 @@ The project is intended to run as a front-end app with a lightweight dev server.
 - Jump: **Space**
 - Sprint: Hold **Shift** while moving
 - Attack: **F** to swing your sword
-- Interact: **E** near the shrine to unlock tower tech (costs 10 gold)
+- Interact: **E** near the shrine to unlock tower tech (costs 10 gold); **E+↓** to place a barricade during the day or drop gold to shed burden
 - Reset: **R** to restart immediately; a Restart button also appears after win/lose
 - Menu: **Esc** or the header **Menu** button to open the in-game menu (pauses the run; start or restart from there)
 - Fullscreen: Click **Go fullscreen** in the top chrome bar to enter or exit fullscreen; the canvas will resize to fit your display.
@@ -83,7 +85,7 @@ The project is intended to run as a front-end app with a lightweight dev server.
 
 ## Win and lose conditions
 - Win: Endure through **3 nights**. A victory banner appears and you can restart from the HUD.
-- Lose: Any enemy touching the player knocks off the crown and immediately ends the run.
+- Lose: Aura collapses when you are hit while in a critical, zero-aura state, sending the player off the island.
 
 ## Contributing and testing
 - Use short-lived feature branches and open pull requests that describe the change and any player-facing impact.

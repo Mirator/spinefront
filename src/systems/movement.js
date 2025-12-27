@@ -1,6 +1,8 @@
-import { ECONOMY, SHRINE_TECH } from '../core/constants.js';
+import { ECONOMY, GOLD_BURDEN, SHRINE_TECH } from '../core/constants.js';
 import { createBarricade } from '../state/entities.js';
 import { overlaps } from './combat.js';
+import { clamp } from './math.js';
+import { applyPuzzleReward, findNearbyPuzzle, startJumpPuzzle } from './puzzles.js';
 
 const SHRINE_INTERACT_MARGIN = 12;
 const REPAIR_RANGE = 42;
@@ -83,27 +85,54 @@ function tryShrinePurchase(state) {
   return true;
 }
 
-function handleCrownPickup(player, state) {
-  const drop = state.droppedCrown;
-  if (!drop?.active) return false;
-  const pickupZone = {
-    x: drop.x - 10,
-    y: drop.y - 10,
-    w: 20,
-    h: 20,
-  };
-  if (overlaps(player, pickupZone)) {
-    player.crown = true;
-    drop.active = false;
-    drop.timer = 0;
-    state.hudText = 'Crown recovered!';
-    return true;
+function togglePuzzleRewardSelection(state, input, nearPuzzle) {
+  if (!nearPuzzle || !state.pendingPuzzleReward) {
+    state.puzzleSelectionHeld = false;
+    return;
   }
-  return false;
+  const wantsToggle = input.up || input.down;
+  if (wantsToggle && !state.puzzleSelectionHeld) {
+    const options = ['gold', 'relic', 'legacy'];
+    const current = options.indexOf(state.puzzleRewardSelection);
+    const next = (current + 1) % options.length;
+    state.puzzleRewardSelection = options[next];
+    state.puzzleSelectionHeld = true;
+    state.hudText = `Puzzle reward focus: ${state.puzzleRewardSelection}`;
+  } else if (!wantsToggle) {
+    state.puzzleSelectionHeld = false;
+  }
+}
+
+function dropGold(state, amount = GOLD_BURDEN.manualDropAmount) {
+  const available = Math.max(0, state.currency || 0);
+  const chunk = Math.min(available, Math.max(1, amount));
+  if (chunk <= 0) {
+    state.hudText = 'No gold to drop.';
+    return false;
+  }
+  state.currency -= chunk;
+  state.hudText = `Dropped ${chunk} gold to steady your aura.`;
+  return true;
+}
+
+function computeBurdenMultipliers(state) {
+  const gold = Math.max(0, state.currency || 0);
+  const burden = Math.max(0, gold - GOLD_BURDEN.freeLoad);
+  const span = Math.max(1, GOLD_BURDEN.slowSoftCap - GOLD_BURDEN.freeLoad);
+  const ratio = clamp(burden / span, 0, 1);
+  const resist = 1 - (state.relicModifiers?.sprintResist || 0);
+  const walkPenalty = ratio * GOLD_BURDEN.maxWalkSlow * resist;
+  const sprintPenalty = ratio * GOLD_BURDEN.maxSprintSlow * resist;
+  return {
+    walkMultiplier: Math.max(0.4, 1 - walkPenalty),
+    sprintMultiplier: Math.max(0.35, 1 - sprintPenalty),
+    ratio,
+  };
 }
 
 export function applyInputToPlayer(player, input, state, shrine, towers, walls, barricades, world) {
   if (state.ended) return false;
+  state.jumpIntent = false;
   let swung = false;
   if (!input.interact) {
     state.interactionLatch = false;
@@ -115,8 +144,11 @@ export function applyInputToPlayer(player, input, state, shrine, towers, walls, 
     playerCenter > shrine.x - SHRINE_INTERACT_MARGIN && playerCenter < shrine.x + shrine.w + SHRINE_INTERACT_MARGIN;
   const verticalOverlap = playerHead >= shrine.y - SHRINE_INTERACT_MARGIN && playerFeet <= shrine.y + shrine.h + SHRINE_INTERACT_MARGIN;
   const nearShrine = horizontalOverlap && verticalOverlap;
+  const nearPuzzle = findNearbyPuzzle(player, state.jumpPuzzles);
   player.onLadder = false;
-  const accel = input.sprint ? player.sprintSpeed : player.speed;
+  const burden = computeBurdenMultipliers(state);
+  state.burdenRatio = burden.ratio;
+  const accel = input.sprint ? player.sprintSpeed * burden.sprintMultiplier : player.speed * burden.walkMultiplier;
   player.vx = 0;
   if (input.left) {
     player.vx = -accel;
@@ -129,6 +161,7 @@ export function applyInputToPlayer(player, input, state, shrine, towers, walls, 
   if (player.onGround && input.jump) {
     player.vy = -player.jumpForce;
     player.onGround = false;
+    state.jumpIntent = true;
   }
 
   if (input.attack && player.attackTimer <= 0) {
@@ -137,15 +170,19 @@ export function applyInputToPlayer(player, input, state, shrine, towers, walls, 
   }
 
   toggleShrineSelection(state, input, nearShrine);
-
-  if (state.droppedCrown?.active) {
-    handleCrownPickup(player, state);
-  }
+  togglePuzzleRewardSelection(state, input, nearPuzzle);
 
   const tryInteract = input.interact && !state.interactionLatch;
   if (tryInteract && nearShrine) {
     state.interactionLatch = true;
     tryShrinePurchase(state);
+  } else if (tryInteract && nearPuzzle) {
+    state.interactionLatch = true;
+    if (state.pendingPuzzleReward === nearPuzzle.id) {
+      applyPuzzleReward(state, nearPuzzle.id);
+    } else {
+      startJumpPuzzle(state, nearPuzzle.id);
+    }
   } else if (tryInteract && !state.isNight) {
     const structures = [...walls, ...towers];
     const nearbyStructure = structures.find((s) => Math.abs(playerCenter - (s.x + s.w / 2)) < REPAIR_RANGE);
@@ -154,8 +191,14 @@ export function applyInputToPlayer(player, input, state, shrine, towers, walls, 
       repairStructure(nearbyStructure, state);
     } else if (input.down) {
       state.interactionLatch = true;
-      placeBarricade(player, world, state, barricades, [...structures, ...barricades]);
+      const placed = placeBarricade(player, world, state, barricades, [...structures, ...barricades]);
+      if (!placed) {
+        dropGold(state);
+      }
     }
+  } else if (tryInteract && input.down) {
+    state.interactionLatch = true;
+    dropGold(state);
   }
 
   return swung;

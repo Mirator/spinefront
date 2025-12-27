@@ -28,7 +28,6 @@ export function createPlayer(world) {
     swingTimer: 0,
     swingDuration: 0.22,
     swingFacing: 1,
-    crown: true,
     aura: AURA.max,
     maxAura: AURA.max,
     auraHitCooldown: 0,

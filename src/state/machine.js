@@ -75,8 +75,6 @@ export function describeMenuState(stateValue, context = {}) {
     labels.menuStatus = 'Run complete';
     if (context.lossReason === 'aura') {
       labels.menuMessage = 'Defeat: Your aura was extinguished.';
-    } else if (context.lossReason === 'crown') {
-      labels.menuMessage = 'Defeat: The crown was lost to the horde.';
     } else {
       labels.menuMessage = END_MESSAGE;
     }

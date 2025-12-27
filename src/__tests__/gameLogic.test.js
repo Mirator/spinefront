@@ -9,6 +9,7 @@ import { updateEnemySpawns } from '../systems/spawning.js';
 import { deriveWaveDefinition } from '../state/waves.js';
 import { createIslandContext } from '../state/islands.js';
 import { applyPlayerAuraHit, updateAuraRecovery } from '../systems/aura.js';
+import { applyPuzzleReward, updateJumpPuzzles } from '../systems/puzzles.js';
 
 describe('game logic systems', () => {
   it('awards currency per cycle and ends after enough nights', () => {
@@ -25,7 +26,7 @@ describe('game logic systems', () => {
     expect(state.isNight).toBe(false);
     expect(state.currency).toBe(ECONOMY.dayIncome * 2 + ECONOMY.nightIncome);
 
-    state.crownLost = true;
+    state.playerFallen = true;
     const loss = checkEndConditions(state, world);
     expect(loss).toBe('loss');
   });
@@ -161,6 +162,47 @@ describe('game logic systems', () => {
     expect(store.player.vy).toBeGreaterThan(initialVy);
   });
 
+  it('slows sprinting when carrying heavy gold', () => {
+    const store = createGameStore();
+    const input = {
+      left: false,
+      right: true,
+      up: false,
+      down: false,
+      sprint: true,
+      jump: false,
+      attack: false,
+      interact: false,
+    };
+
+    store.state.currency = 0;
+    applyInputToPlayer(
+      store.player,
+      input,
+      store.state,
+      store.shrine,
+      store.towers,
+      store.walls,
+      store.barricades,
+      store.world,
+    );
+    const baselineVx = store.player.vx;
+
+    store.state.currency = 20;
+    applyInputToPlayer(
+      store.player,
+      input,
+      store.state,
+      store.shrine,
+      store.towers,
+      store.walls,
+      store.barricades,
+      store.world,
+    );
+
+    expect(store.player.vx).toBeLessThan(baselineVx);
+  });
+
   it('detects sword hits on enemies', () => {
     const store = createGameStore();
     const enemy = createEnemy('left', store.world);
@@ -233,13 +275,15 @@ describe('game logic systems', () => {
     store.state.currency = 0;
     store.state.shrineUnlocked = true;
     store.state.enemies.push(createEnemy('left', store.world));
-    store.player.crown = false;
+    store.state.jumpPuzzles = [];
+    store.state.relics = [{ id: 'temp' }];
 
     resetGameStore(store);
     expect(store.state.currency).toBe(ECONOMY.dayIncome);
     expect(store.state.shrineUnlocked).toBe(false);
     expect(store.state.enemies).toHaveLength(0);
-    expect(store.player.crown).toBe(true);
+    expect(store.state.jumpPuzzles.length).toBeGreaterThan(0);
+    expect(store.state.relics).toHaveLength(0);
   });
 
   it('keeps wave intervals consistent within a single night', () => {
@@ -283,19 +327,59 @@ describe('game logic systems', () => {
     expect(player.aura).toBeGreaterThan(auraAfterHit);
   });
 
-  it('loses the run immediately when aura hits zero', () => {
+  it('enters a critical state at zero aura and falls on the next hit', () => {
     const store = createGameStore();
     const { player, state, world, baseWorld } = store;
     player.aura = 10;
 
     applyPlayerAuraHit(player, state);
     expect(player.aura).toBe(0);
+    expect(player.critical).toBe(true);
+    expect(state.playerFallen).toBe(false);
+
+    player.auraHitCooldown = 0;
+    applyPlayerAuraHit(player, state);
     expect(state.playerFallen).toBe(true);
     expect(state.lossReason).toBe('aura');
 
     // Run an update tick to propagate the loss into menu labels.
     updateAuraRecovery(player, state, baseWorld, world, 0.1);
     checkEndConditions(state, world);
+  });
+
+  it('lets daytime jump puzzles trade time for a chosen reward', () => {
+    const store = createGameStore();
+    const { state, player, world } = store;
+    const puzzle = state.jumpPuzzles[0];
+    state.isNight = false;
+    player.x = puzzle.x;
+    const input = {
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      sprint: false,
+      jump: false,
+      attack: false,
+      interact: true,
+    };
+
+    applyInputToPlayer(player, input, state, store.shrine, store.towers, store.walls, store.barricades, world);
+    expect(state.activePuzzle).not.toBeNull();
+
+    state.jumpIntent = true;
+    updateJumpPuzzles(state, player, world, 1);
+    state.jumpIntent = true;
+    updateJumpPuzzles(state, player, world, 1);
+    state.jumpIntent = true;
+    updateJumpPuzzles(state, player, world, 1);
+    expect(state.pendingPuzzleReward).toBe(puzzle.id);
+    expect(state.dayTimer).toBeGreaterThan(0);
+
+    state.puzzleRewardSelection = 'legacy';
+    applyPuzzleReward(state, puzzle.id);
+    expect(state.legacy).toBe(1);
+    expect(state.pendingPuzzleReward).toBeNull();
   });
 
   it('derives shorter wave intervals on later nights', () => {

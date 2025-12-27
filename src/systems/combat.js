@@ -326,21 +326,12 @@ export function updateProjectiles(
   return { remaining, hits };
 }
 
-export function checkCrownLoss(enemies, player, state, effects, onPlayerHit) {
+export function checkPlayerContact(enemies, player, state, effects, onPlayerHit) {
   let playerHit = false;
   enemies.forEach((e) => {
     if (e.hp <= 0) return;
     if (overlaps(e, player)) {
       playerHit = true;
-      if (player.crown && !state.droppedCrown?.active) {
-        player.crown = false;
-        state.droppedCrown = {
-          active: true,
-          x: player.x + player.w / 2,
-          y: player.y + player.h,
-          timer: 10,
-        };
-      }
     }
   });
 
@@ -351,15 +342,6 @@ export function checkCrownLoss(enemies, player, state, effects, onPlayerHit) {
     onPlayerHit();
   }
   return playerHit;
-}
-
-export function updateCrownDrop(state, dt) {
-  if (!state.droppedCrown?.active) return;
-  state.droppedCrown.timer = Math.max(0, state.droppedCrown.timer - dt);
-  if (state.droppedCrown.timer <= 0 && !state.crownLost) {
-    state.crownLost = true;
-    state.lossReason = 'crown';
-  }
 }
 
 export function cleanupEnemies(enemies, world) {
