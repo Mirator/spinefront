@@ -666,9 +666,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = 'rgba(229, 231, 235, 0.9)';
-    const text =
-      'Move: A/D or ←/→ | Jump: Space | Ladder: W/S or ↑/↓ | Sprint: Shift | Attack: F | Interact/Build/Drop: E (E+↓ for barricade or gold drop) | Restart: R | Menu: Esc';
-    ctx.fillText(text, canvas.width / 2, canvas.height - 12);
+    ctx.fillText('Move: A/D | Jump: Space | Attack: F | Interact/Drop: E | Menu: Esc', canvas.width / 2, canvas.height - 12);
     ctx.restore();
   }
 
@@ -740,7 +738,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
 
     ctx.fillStyle = '#9ca3af';
     ctx.font = '14px Inter, system-ui, sans-serif';
-    const message = state.menuMessage || 'Survive 3 nights, manage your aura burden, and unlock the shrine.';
+    const message = state.menuMessage || 'Survive 3 nights and secure the shrine.';
     ctx.fillText(message, panelX + 18, panelY + 64);
 
     if (state.island?.bonus?.name) {
@@ -755,14 +753,10 @@ export function createRenderer({ canvas, colors = COLORS }) {
 
     ctx.font = '13px Inter, system-ui, sans-serif';
     const items = [
-      'Endure 3 nights to ascend to the next sky island.',
-      'Keep walls and towers standing to slow the corruption.',
-      'Gold fuels aura recovery but slows sprinting and destabilizes aura when hoarded.',
-      'Interact + Down drops gold to shed burden; hold enough to heal within your walls.',
-      'Optional jump puzzles sit off the lane — they eat daylight but grant gold, relics, or legacy.',
+      'Endure 3 nights to ascend.',
+      'Defend walls, repair in daylight.',
+      'Gold heals inside walls but slows you when hoarded.',
       shrineHelpCopy(),
-      'Income arrives at dawn (+10) and at the start of each night (+5), plus any island bonus.',
-      `Daytime: repair walls/towers (Interact) or place barricades with Interact+Down.`,
     ];
     items.forEach((line, idx) => {
       ctx.fillText(`• ${line}`, panelX + 18, panelY + 110 + idx * 18);
@@ -784,12 +778,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.fillText(startLabel, buttonX + 16, buttonY + buttonHeight / 2);
 
     ctx.fillStyle = '#e5e7eb';
-    const actions = [
-      'Open/close menu: Esc',
-      'Restart: R',
-      'Mobile: Drag left pad to move/up/down',
-      'Mobile: Right buttons: Jump / Attack / Interact',
-    ];
+    const actions = ['Menu: Esc', 'Restart: R', 'Mobile: move left pad, actions on right'];
     const actionsStartY = panelY + 110 + items.length * 18 + 12;
     actions.forEach((line, idx) => {
       ctx.fillText(line, panelX + 18, actionsStartY + idx * 18);

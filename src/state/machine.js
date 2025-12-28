@@ -31,8 +31,8 @@ const MENU_TRANSITIONS = {
   },
 };
 
-const DEFAULT_ISLAND_LINE = 'Hold the line on this island, then ascend.';
-const END_MESSAGE = 'Defeat or victory, regroup and launch a fresh climb.';
+const DEFAULT_ISLAND_LINE = 'Hold the line and climb onward.';
+const END_MESSAGE = 'Reset and try again.';
 
 function deriveIslandLine(state = {}) {
   const bonusName = state.island?.bonus?.name;
@@ -68,13 +68,13 @@ export function describeMenuState(stateValue, context = {}) {
     flags.paused = false;
     flags.hasStarted = true;
   } else if (stateValue === MENU_STATES.PAUSED) {
-    labels.menuStatus = 'Run paused';
-    labels.menuStartLabel = context.pendingAscend ? 'Ascend' : 'Resume run';
+    labels.menuStatus = 'Paused';
+    labels.menuStartLabel = context.pendingAscend ? 'Ascend' : 'Resume';
     flags.hasStarted = true;
   } else if (stateValue === MENU_STATES.ENDED) {
     labels.menuStatus = 'Run complete';
     if (context.lossReason === 'aura') {
-      labels.menuMessage = 'Defeat: Your aura was extinguished.';
+      labels.menuMessage = 'Aura collapsed.';
     } else {
       labels.menuMessage = END_MESSAGE;
     }
@@ -83,7 +83,7 @@ export function describeMenuState(stateValue, context = {}) {
     flags.hasStarted = true;
   } else if (stateValue === MENU_STATES.ASCEND_READY) {
     labels.menuStatus = `Island ${context.islandLevel ?? 1} cleared`;
-    labels.menuMessage = 'Climb to the next sky island with what you have learned.';
+    labels.menuMessage = 'Climb when ready.';
     labels.menuStartLabel = 'Ascend';
     flags.pendingAscend = true;
     flags.hasStarted = true;

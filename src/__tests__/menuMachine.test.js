@@ -20,8 +20,8 @@ describe('menu state machine', () => {
     session.closeMenu(); // start running
     session.transitionMenu('pause'); // open paused menu
     state = session.getState();
-    expect(state.menuStatus).toBe('Run paused');
-    expect(state.menuStartLabel).toBe('Resume run');
+    expect(state.menuStatus).toBe('Paused');
+    expect(state.menuStartLabel).toBe('Resume');
 
     session.transitionMenu('resume');
     session.transitionMenu('ascend');
