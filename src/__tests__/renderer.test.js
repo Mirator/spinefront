@@ -24,6 +24,7 @@ function createMockCanvas() {
     strokeRect: noop,
     clearRect: noop,
     translate: noop,
+    rotate: noop,
     fillText: vi.fn((text) => fillTextCalls.push(text)),
     measureText: vi.fn((text) => ({ width: (text?.length || 0) * 7 })),
     createLinearGradient: vi.fn(() => gradient),

@@ -805,114 +805,239 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
+  function drawParallax(ctx, camera, factor, color, offsetY, seed) {
+    const parallaxX = camera.x * factor;
+    const rng = createRng(seed);
+    const nodes = 12;
+    const width = 2000;
+    const step = width / (nodes - 1);
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(camera.x - 100, camera.h); // Start bottom-left
+
+    const startX = Math.floor((camera.x - parallaxX) / width) * width + parallaxX;
+
+    // Draw two full widths to cover screen wrap
+    for (let loop = 0; loop < 2; loop++) {
+      const baseX = startX + loop * width;
+      if (baseX > camera.x + camera.w + 100) continue;
+
+      for (let i = 0; i < nodes; i++) {
+        const x = baseX + i * step - parallaxX; // Apply parallax shift
+        const featureHeight = 60 + rng.uniform(0, 1) * 80;
+        const y = camera.h - offsetY - featureHeight * (0.5 + 0.5 * Math.sin(i * 1.5 + seed));
+
+        // Connect smoothly
+        if (loop === 0 && i === 0) {
+          ctx.lineTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+    }
+
+    ctx.lineTo(camera.x + camera.w + 100, camera.h);
+    ctx.lineTo(camera.x - 100, camera.h);
+    ctx.fill();
+  }
+
+  function drawProceduralLayer(ctx, camera, factor, color, baseY, seed, scaleY = 1) {
+    const viewX = camera.x * factor;
+    const nodes = 20;
+    const chunkWidth = 1200;
+    const step = chunkWidth / nodes;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(camera.x, camera.h);
+
+    const startIdx = Math.floor((camera.x - viewX) / step) - 2;
+    const endIdx = startIdx + Math.ceil(camera.w / step) + 4;
+
+    for (let i = startIdx; i <= endIdx; i++) {
+      const rng = createRng(seed ^ i * 73);
+      const h = rng.uniform(20, 100) * scaleY;
+      const x = i * step + viewX;
+      const y = camera.h - baseY - h;
+      ctx.lineTo(x, y);
+    }
+
+    ctx.lineTo(camera.x + camera.w, camera.h);
+    ctx.lineTo(camera.x, camera.h);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawVegetation(ctx, surfacePoints, seed) {
+    if (surfacePoints.length < 2) return;
+    const rng = createRng(seed);
+    ctx.fillStyle = shadeColor(colors.islandTop, -0.2); // Darker grass
+
+    for (let i = 0; i < surfacePoints.length - 1; i++) {
+      const pt = surfacePoints[i];
+      const next = surfacePoints[i + 1];
+      const dist = Math.abs(next.x - pt.x);
+
+      if (dist > 20 && dist < 100) { // Only on relatively flat processing
+        const count = Math.floor(dist / 12);
+        for (let j = 0; j < count; j++) {
+          if (rng.uniform(0, 1) > 0.6) continue;
+          const t = j / count;
+          const x = pt.x + (next.x - pt.x) * t;
+          const y = pt.y + (next.y - pt.y) * t;
+
+          // Draw tuft
+          const h = rng.uniform(4, 9);
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - 2, y - h);
+          ctx.lineTo(x + 2, y - h);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
   function drawBackground(state, world, camera) {
     ctx.clearRect(-state.effects.shakeOffset.x, -state.effects.shakeOffset.y, canvas.width, canvas.height);
     const altitudeBlend = clamp((state.islandLevel - 1) * 0.12, 0, 1);
-    const skyTop = lerpColor('#c7e9ff', '#0c1324', state.skyBlend * 0.7 + altitudeBlend * 0.3);
-    const skyBottom = lerpColor('#6bb7ff', '#0f1c3c', state.skyBlend * 0.7 + altitudeBlend * 0.3);
+
+    // Enhanced Sky Gradient
+    const skyTop = lerpColor('#a5f3fc', '#0f172a', state.skyBlend); // Pale blue to deep night
+    const skyMid = lerpColor('#e0f2fe', '#1e293b', state.skyBlend);
+    const skyBot = lerpColor('#f0f9ff', '#334155', state.skyBlend);
+
     const gradient = ctx.createLinearGradient(0, 0, 0, camera.h);
     gradient.addColorStop(0, skyTop);
-    gradient.addColorStop(1, skyBottom);
+    gradient.addColorStop(0.6, skyMid);
+    gradient.addColorStop(1, skyBot);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, camera.w, camera.h);
 
-    const duskStrength = 1 - Math.abs(0.5 - state.skyBlend) * 1.8;
+    // Dusk Overlay
+    const duskStrength = 1 - Math.abs(0.5 - state.skyBlend) * 2; // Peak at 0.5
     if (duskStrength > 0) {
       const dusk = ctx.createLinearGradient(0, 0, 0, camera.h);
-      dusk.addColorStop(0, `rgba(252, 211, 77, ${0.18 * duskStrength})`);
-      dusk.addColorStop(1, `rgba(79, 70, 229, ${0.25 * duskStrength})`);
+      dusk.addColorStop(0, `rgba(253, 186, 116, ${0.4 * duskStrength})`); // Orange/Peach
+      dusk.addColorStop(1, `rgba(129, 140, 248, ${0.3 * duskStrength})`); // Indigo
       ctx.fillStyle = dusk;
       ctx.fillRect(0, 0, camera.w, camera.h);
     }
 
     drawCelestials(state, world, camera);
 
+    // Parallax Layers
+    const seed = state.randomSeed || 123;
+    const nightMode = state.skyBlend > 0.8;
+    const mountainColor = nightMode ? '#1e293b' : '#cbd5e1';  // Slate-ish
+    const hillColor = nightMode ? '#334155' : '#94a3b8';
+
+    drawProceduralLayer(ctx, camera, 0.2, mountainColor, -50, seed, 1.5);
+    drawProceduralLayer(ctx, camera, 0.5, hillColor, -120, seed + 1, 0.8);
+
+    // Atmosphere/Clouds below island
+    const cloudGradient = ctx.createLinearGradient(0, camera.h - 150, 0, camera.h);
+    cloudGradient.addColorStop(0, 'rgba(255,255,255,0)');
+    cloudGradient.addColorStop(1, nightMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.4)');
+    ctx.fillStyle = cloudGradient;
+    ctx.fillRect(0, camera.h - 150, camera.w, 150);
+
+    // Island Rendering
     const groundY = world.ground - camera.y;
-    const islandTop = lerpColor(colors.islandTop, shadeColor(colors.islandTop, -0.15), state.skyBlend * 0.5);
-    const islandShadow = lerpColor(colors.islandShadow, '#0b3323', state.skyBlend * 0.8);
-
-    const drawCloud = (x, y, scale = 1, alpha = 0.4) => {
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.beginPath();
-      ctx.ellipse(x, y, 40 * scale, 18 * scale, 0, 0, Math.PI * 2);
-      ctx.ellipse(x + 26 * scale, y + 8 * scale, 32 * scale, 14 * scale, 0, 0, Math.PI * 2);
-      ctx.ellipse(x - 26 * scale, y + 6 * scale, 26 * scale, 12 * scale, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    const cloudSeed = state.islandLevel || 1;
-    drawCloud((cloudSeed * 57) % camera.w, 90 + (cloudSeed % 4) * 14, 1, 0.45);
-    drawCloud((cloudSeed * 31 + 140) % camera.w, 140, 0.8, 0.35);
-    drawCloud((cloudSeed * 73 + 260) % camera.w, 200, 1.15, 0.5);
+    const islandTop = lerpColor(colors.islandTop, shadeColor(colors.islandTop, -0.4), state.skyBlend * 0.8);
+    const islandShadow = lerpColor(colors.islandShadow, '#022c22', state.skyBlend * 0.9);
 
     ctx.save();
     const islandSeed = (state.randomSeed || 1) ^ ((state.islandLevel || 1) * 977);
     const islandRng = createRng(islandSeed);
-    const leftOverhang = 72 + islandRng.uniform(-18, 22);
-    const rightOverhang = 84 + islandRng.uniform(-22, 28);
-    const slabDepth = 94 + islandRng.uniform(-10, 24);
-    const stratumDepth = 134 + islandRng.uniform(-12, 26);
 
-    const topGradient = ctx.createLinearGradient(0, groundY - 70, 0, groundY + slabDepth);
-    topGradient.addColorStop(0, shadeColor(islandTop, 0.18));
-    topGradient.addColorStop(1, islandTop);
-    ctx.fillStyle = topGradient;
+    const leftOverhang = 80 + islandRng.uniform(-10, 30);
+    const rightOverhang = 90 + islandRng.uniform(-10, 30);
+    const slabDepth = 110;
+
+    // --- Detailed Island Shape Generation ---
+    const surfacePoints = [];
+    const minX = -leftOverhang;
+    const maxX = camera.w + rightOverhang;
+    const detailStep = 30;
+
+    // Generate top surface
     ctx.beginPath();
-    const ridgeCount = 7;
-    const ridgeStep = (camera.w + leftOverhang + rightOverhang) / (ridgeCount - 1);
-    ctx.moveTo(-leftOverhang, groundY);
-    for (let i = 0; i < ridgeCount; i += 1) {
-      const ridgeX = -leftOverhang + ridgeStep * i;
-      const ridgeY = groundY + islandRng.uniform(-10, 12);
-      ctx.lineTo(ridgeX, ridgeY);
+    ctx.moveTo(minX, groundY);
+    surfacePoints.push({ x: minX, y: groundY });
+
+    for (let x = minX; x <= maxX; x += detailStep) {
+      const noise = islandRng.uniform(-4, 4);
+      const y = groundY + noise;
+      ctx.lineTo(x, y);
+      surfacePoints.push({ x, y });
     }
-    ctx.lineTo(camera.w + rightOverhang, groundY + slabDepth * 0.42);
-    ctx.lineTo(camera.w + rightOverhang * 0.45, groundY + slabDepth);
-    ctx.lineTo(camera.w * 0.48, groundY + slabDepth + islandRng.uniform(-6, 14));
-    ctx.lineTo(camera.w * 0.2, groundY + slabDepth * 0.9);
-    ctx.lineTo(-leftOverhang * 0.22, groundY + slabDepth * 0.5);
+
+    // Right edge
+    const rightEdgeY = groundY + slabDepth * 0.4;
+    ctx.lineTo(maxX + 10, rightEdgeY);
+
+    // Bottom rough edge
+    const bottomPoints = [];
+    for (let x = maxX; x >= minX; x -= 40) {
+      const y = groundY + slabDepth + islandRng.uniform(-15, 25) + (Math.sin(x * 0.01) * 20);
+      ctx.lineTo(x, y);
+      bottomPoints.push({ x, y });
+    }
+
+    // Close shape
+    ctx.lineTo(minX - 10, groundY + slabDepth * 0.3);
     ctx.closePath();
+
+    // Fill Main Body (Gradient)
+    const islandGrad = ctx.createLinearGradient(0, groundY, 0, groundY + slabDepth);
+    islandGrad.addColorStop(0, islandTop);
+    islandGrad.addColorStop(1, islandShadow);
+    ctx.fillStyle = islandGrad;
     ctx.fill();
 
-    ctx.fillStyle = islandShadow;
-    const underbellyY = groundY + slabDepth * 0.74;
-    ctx.beginPath();
-    ctx.moveTo(-leftOverhang * 0.1, underbellyY + islandRng.uniform(-6, 8));
-    ctx.lineTo(camera.w + rightOverhang * 0.24, underbellyY + islandRng.uniform(-4, 10));
-    ctx.lineTo(camera.w + rightOverhang * 0.1, underbellyY + stratumDepth * 0.35);
-    ctx.lineTo(camera.w * 0.64, underbellyY + stratumDepth * 0.65 + islandRng.uniform(-10, 12));
-    ctx.lineTo(camera.w * 0.32, underbellyY + stratumDepth * 0.52 + islandRng.uniform(-8, 10));
-    ctx.lineTo(-leftOverhang * 0.06, underbellyY + stratumDepth * 0.32);
-    ctx.closePath();
-    ctx.fill();
-
-    const columnCount = 4;
-    for (let i = 0; i < columnCount; i += 1) {
-      const center = camera.w * (0.18 + i * 0.18) + islandRng.uniform(-30, 30);
-      const width = 62 + islandRng.uniform(-12, 18);
-      const height = stratumDepth * 0.5 + islandRng.uniform(-8, 36);
-      ctx.fillStyle = shadeColor(islandShadow, i % 2 === 0 ? -0.04 : 0.06);
+    // Add "Dirt/Rock" texture/noise to the side
+    ctx.globalCompositeOperation = 'source-atop'; // Only draw on the island
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    for (let i = 0; i < 40; i++) {
+      const rx = islandRng.uniform(minX, maxX);
+      const ry = islandRng.uniform(groundY + 10, groundY + slabDepth);
+      const rw = islandRng.uniform(10, 60);
+      const rh = islandRng.uniform(4, 15);
       ctx.beginPath();
-      ctx.moveTo(center - width * 0.48, underbellyY + islandRng.uniform(-6, 6));
-      ctx.lineTo(center + width * 0.48, underbellyY + islandRng.uniform(-6, 6));
-      ctx.lineTo(center + width * 0.32, underbellyY + height);
-      ctx.lineTo(center - width * 0.42, underbellyY + height * 0.92);
-      ctx.closePath();
+      ctx.ellipse(rx, ry, rw, rh, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.globalCompositeOperation = 'source-over';
 
-    const debrisCount = 5 + islandRng.int(0, 2);
-    ctx.fillStyle = shadeColor(islandShadow, -0.12);
-    for (let i = 0; i < debrisCount; i += 1) {
-      const driftX = camera.w * (0.12 + 0.16 * i) + islandRng.uniform(-28, 28);
-      const driftY = underbellyY + stratumDepth * 0.9 + islandRng.uniform(-12, 22);
-      const rockWidth = 24 + islandRng.uniform(-6, 10);
-      const rockHeight = 10 + islandRng.uniform(-4, 8);
-      drawRoundedRect(ctx, driftX, driftY, rockWidth, rockHeight, 4);
+    // Top Strip (Grass hint)
+    ctx.strokeStyle = shadeColor(islandTop, 0.15);
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    surfacePoints.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    // Vegetation
+    drawVegetation(ctx, surfacePoints, islandSeed);
+
+    // Debris (Floating Rocks)
+    const debrisCount = 6 + islandRng.int(0, 3);
+    for (let i = 0; i < debrisCount; i++) {
+      const dx = camera.w * (0.1 + 0.8 * (i / debrisCount)) + islandRng.uniform(-40, 40);
+      const dy = groundY + slabDepth + islandRng.uniform(20, 100);
+      const size = islandRng.uniform(10, 25);
+
+      ctx.fillStyle = islandShadow;
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.rotate(islandRng.uniform(0, Math.PI * 2));
+      drawRoundedRect(ctx, -size / 2, -size / 2, size, size * 0.6, 4);
       ctx.fill();
+      ctx.restore();
     }
 
     ctx.restore();
