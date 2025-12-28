@@ -100,3 +100,27 @@ export const PUZZLES = {
   legacyReward: 1,
   relicOptions: ['steady_aura', 'lightfoot', 'damping_field'],
 };
+
+export const PLAYER_STATS = {
+  speed: 220,
+  sprintSpeed: 340,
+  jumpForce: 650,
+  attackCooldown: 0.4,
+  swingDuration: 0.22,
+};
+
+export const COMBAT_CONFIG = {
+  towerProjectileSpeed: 520,
+  towerRange: 360,
+  sapperProjectileSpeed: 280,
+  sapperRange: 260,
+  sapperPreferredRange: 200,
+  baseProjectileDamage: 18,
+  swingPadding: 8,
+};
+
+export const INTERACTION_CONFIG = {
+  shrineMargin: 12,
+  repairRange: 42,
+  repairAmount: 30,
+};

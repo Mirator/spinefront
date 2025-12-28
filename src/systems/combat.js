@@ -1,12 +1,18 @@
-import { COLORS, SHRINE_TECH } from '../core/constants.js';
+import { COLORS, COMBAT_CONFIG, SHRINE_TECH } from '../core/constants.js';
 import { addHitFlash, triggerDangerFlash, triggerScreenShake } from './effects.js';
 
-export const BASE_PROJECTILE_DAMAGE = 18;
+export const BASE_PROJECTILE_DAMAGE = COMBAT_CONFIG.baseProjectileDamage;
 
 export function overlaps(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+/**
+ * Applies damage to an entity and returns the remaining HP.
+ * @param {object} target - The entity receiving damage.
+ * @param {number} amount - The amount of damage to deal.
+ * @returns {number} The remaining HP of the target.
+ */
 export function applyDamage(target, amount) {
   target.hp = Math.max(0, target.hp - amount);
   return target.hp;
@@ -33,7 +39,6 @@ function angleWithinSweep(angle, start, end, dir) {
 }
 
 const CARDINAL_ANGLES = [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2];
-const SWING_PADDING = 8;
 
 function getSwingGeometry(player) {
   const dir = player.swingFacing || player.facing || 1;
@@ -64,10 +69,10 @@ function computeSwingBounds(geometry) {
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
   return {
-    x: minX - SWING_PADDING,
-    y: minY - SWING_PADDING,
-    w: maxX - minX + SWING_PADDING * 2,
-    h: maxY - minY + SWING_PADDING * 2,
+    x: minX - COMBAT_CONFIG.swingPadding,
+    y: minY - COMBAT_CONFIG.swingPadding,
+    w: maxX - minX + COMBAT_CONFIG.swingPadding * 2,
+    h: maxY - minY + COMBAT_CONFIG.swingPadding * 2,
   };
 }
 
@@ -152,7 +157,7 @@ export function spawnTowerProjectile(tower, target) {
   const dy = targetY - muzzleY;
   const distance = Math.hypot(dx, dy);
   if (distance === 0) return null;
-  const speed = 520;
+  const speed = COMBAT_CONFIG.towerProjectileSpeed;
   const vx = (dx / distance) * speed;
   const vy = (dy / distance) * speed;
   const damageScale = Math.max(0.6, tower.damageMultiplier || 1);
@@ -190,7 +195,7 @@ export function updateTowers(towers, enemies, projectiles, shrineTech, dt) {
     if (tower.hp <= 0) return;
     tower.fireTimer -= dt;
     if (tower.fireTimer <= 0) {
-      const range = 360;
+      const range = COMBAT_CONFIG.towerRange;
       const target = enemies.find((e) => e.hp > 0 && Math.abs(e.x - tower.x) < range);
       if (target) {
         const dx = target.x + target.w / 2 - (tower.x + tower.w / 2);
@@ -232,7 +237,7 @@ function spawnSapperProjectile(enemy, target) {
   const dy = ty - muzzleY;
   const dist = Math.hypot(dx, dy);
   if (dist <= 0) return null;
-  const speed = enemy.ranged?.projectileSpeed || 280;
+  const speed = enemy.ranged?.projectileSpeed || COMBAT_CONFIG.sapperProjectileSpeed;
   const vx = (dx / dist) * speed;
   const vy = (dy / dist) * speed;
   return {

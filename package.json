@@ -9,10 +9,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "lint": "eslint src"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.2",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
     "vite": "^5.3.4",
     "vitest": "^2.0.2"
   }

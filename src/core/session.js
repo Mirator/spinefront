@@ -41,6 +41,9 @@ function createSnapshot(store) {
   };
 }
 
+/**
+ * Manages the game lifecycle, state, and main loop integration.
+ */
 export class GameSession {
   constructor(dimensions = {}) {
     this.store = createGameStore(dimensions);
@@ -200,9 +203,7 @@ export class GameSession {
     );
     if (swung) {
       swingSword(this.store.player, state.enemies, 25, swordCallbacks);
-    }
-
-    if (this.store.player.swingTimer > 0) {
+    } else if (this.store.player.swingTimer > 0) {
       updateSwordCollision(this.store.player, state.enemies, swordCallbacks);
     }
 

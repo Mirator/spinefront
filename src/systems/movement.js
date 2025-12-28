@@ -1,12 +1,8 @@
-import { ECONOMY, GOLD_BURDEN, SHRINE_TECH } from '../core/constants.js';
+import { ECONOMY, GOLD_BURDEN, INTERACTION_CONFIG, SHRINE_TECH } from '../core/constants.js';
 import { createBarricade } from '../state/entities.js';
 import { overlaps } from './combat.js';
 import { clamp } from './math.js';
 import { applyPuzzleReward, findNearbyPuzzle, startJumpPuzzle } from './puzzles.js';
-
-const SHRINE_INTERACT_MARGIN = 12;
-const REPAIR_RANGE = 42;
-const REPAIR_AMOUNT = 30;
 
 function nextTechCost(tier) {
   const capped = Math.min(tier, SHRINE_TECH.costs.length - 1);
@@ -41,7 +37,7 @@ function repairStructure(structure, state) {
     return false;
   }
   state.currency -= ECONOMY.repairCost;
-  structure.hp = Math.min(structure.maxHp, structure.hp + REPAIR_AMOUNT);
+  structure.hp = Math.min(structure.maxHp, structure.hp + INTERACTION_CONFIG.repairAmount);
   state.hudText = `Repaired ${structure.type} for ${ECONOMY.repairCost} gold.`;
   return true;
 }
@@ -141,8 +137,11 @@ export function applyInputToPlayer(player, input, state, shrine, towers, walls, 
   const playerHead = player.y;
   const playerFeet = player.y + player.h;
   const horizontalOverlap =
-    playerCenter > shrine.x - SHRINE_INTERACT_MARGIN && playerCenter < shrine.x + shrine.w + SHRINE_INTERACT_MARGIN;
-  const verticalOverlap = playerHead >= shrine.y - SHRINE_INTERACT_MARGIN && playerFeet <= shrine.y + shrine.h + SHRINE_INTERACT_MARGIN;
+    playerCenter > shrine.x - INTERACTION_CONFIG.shrineMargin &&
+    playerCenter < shrine.x + shrine.w + INTERACTION_CONFIG.shrineMargin;
+  const verticalOverlap =
+    playerHead >= shrine.y - INTERACTION_CONFIG.shrineMargin &&
+    playerFeet <= shrine.y + shrine.h + INTERACTION_CONFIG.shrineMargin;
   const nearShrine = horizontalOverlap && verticalOverlap;
   const nearPuzzle = findNearbyPuzzle(player, state.jumpPuzzles);
   player.onLadder = false;
@@ -185,7 +184,9 @@ export function applyInputToPlayer(player, input, state, shrine, towers, walls, 
     }
   } else if (tryInteract && !state.isNight) {
     const structures = [...walls, ...towers];
-    const nearbyStructure = structures.find((s) => Math.abs(playerCenter - (s.x + s.w / 2)) < REPAIR_RANGE);
+    const nearbyStructure = structures.find(
+      (s) => Math.abs(playerCenter - (s.x + s.w / 2)) < INTERACTION_CONFIG.repairRange,
+    );
     if (nearbyStructure && nearbyStructure.hp < nearbyStructure.maxHp) {
       state.interactionLatch = true;
       repairStructure(nearbyStructure, state);

@@ -1,4 +1,4 @@
-import { AURA, BASE_POSITIONS, BASE_WORLD, WORLD_DEFAULTS } from '../core/constants.js';
+import { AURA, BASE_POSITIONS, BASE_WORLD, PLAYER_STATS } from '../core/constants.js';
 
 const BASE_DROP_OFFSET = 48;
 const DROP_TARGET_MULTIPLIER = 6; // doubled from the previous spacing
@@ -17,16 +17,16 @@ export function createPlayer(world) {
     h: 40,
     vx: 0,
     vy: 0,
-    speed: 220,
-    sprintSpeed: 340,
-    jumpForce: 650,
+    speed: PLAYER_STATS.speed,
+    sprintSpeed: PLAYER_STATS.sprintSpeed,
+    jumpForce: PLAYER_STATS.jumpForce,
     onGround: false,
     onLadder: false,
     facing: 1,
-    attackCooldown: 0.4,
+    attackCooldown: PLAYER_STATS.attackCooldown,
     attackTimer: 0,
     swingTimer: 0,
-    swingDuration: 0.22,
+    swingDuration: PLAYER_STATS.swingDuration,
     swingFacing: 1,
     aura: AURA.max,
     maxAura: AURA.max,

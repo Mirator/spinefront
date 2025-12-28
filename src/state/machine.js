@@ -43,6 +43,12 @@ function deriveIslandLine(state = {}) {
   return DEFAULT_ISLAND_LINE;
 }
 
+/**
+ * Derives the menu UI state from the current game state.
+ * @param {string} stateValue - The current menu state enum value.
+ * @param {object} context - The current game state context.
+ * @returns {object} The derived menu state descriptor with labels and flags.
+ */
 export function describeMenuState(stateValue, context = {}) {
   const labels = {
     menuStatus: 'Run paused',
