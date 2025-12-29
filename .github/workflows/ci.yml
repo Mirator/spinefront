@@ -54,6 +54,7 @@ jobs:
   e2e-tests:
     needs: build
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.45.2-jammy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,17 +74,6 @@ jobs:
         with:
           name: dist
           path: dist
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
 
       - name: Run Playwright tests
         run: npm run test:e2e
