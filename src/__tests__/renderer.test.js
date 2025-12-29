@@ -68,7 +68,7 @@ describe('renderer shrine copy', () => {
       projectiles: store.state.projectiles,
     });
 
-    const shrinePrompt = fillTextCalls.find((text) => text?.includes('Unlock shrine'));
-    expect(shrinePrompt).toContain(`(${ECONOMY.shrineCost} gold)`);
+    const shrinePrompt = fillTextCalls.find((text) => text?.includes('[E] Unlock'));
+    expect(shrinePrompt).toContain(`[E] Unlock ${ECONOMY.shrineCost}`);
   });
 });
