@@ -74,21 +74,44 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const auraCenterX = bodyX + bodyW / 2;
     const auraCenterY = bodyY + bodyH / 2;
 
-    ctx.save();
-    const auraRgb = hexToRgb(auraColor);
-    const glow = ctx.createRadialGradient(auraCenterX, auraCenterY, bodyW * 0.3, auraCenterX, auraCenterY, auraRadius);
-    glow.addColorStop(0, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, ${0.22 + auraPulse})`);
-    glow.addColorStop(1, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, 0)`);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = glow;
-    ctx.fillRect(auraCenterX - auraRadius, auraCenterY - auraRadius, auraRadius * 2, auraRadius * 2);
-    ctx.globalCompositeOperation = 'source-over';
+    const time = performance.now() / 1000;
+    const breathe = Math.sin(time * 2.5); // -1 to 1
 
-    ctx.lineWidth = player.critical ? 6 : 4;
-    ctx.strokeStyle = `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, ${0.4 + auraPulse})`;
+    ctx.save();
+
+    // Config for the new "Ethereal" aura
+    const auraRgb = hexToRgb(auraColor);
+    const baseAlpha = player.critical ? 0.35 : 0.15;
+    const pulseIntensity = player.critical ? 0.2 : 0.08;
+    const currentAlpha = baseAlpha + (breathe * 0.5 + 0.5) * pulseIntensity;
+
+    // Layer 1: Subtle wide field (The "presence")
+    const outerRadius = auraRadius * (1.1 + breathe * 0.05);
+    const glow1 = ctx.createRadialGradient(auraCenterX, auraCenterY, bodyW * 0.2, auraCenterX, auraCenterY, outerRadius);
+    glow1.addColorStop(0, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, ${currentAlpha})`);
+    glow1.addColorStop(0.6, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, ${currentAlpha * 0.4})`);
+    glow1.addColorStop(1, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, 0)`);
+
+    ctx.globalCompositeOperation = 'screen'; // Softer than lighter, but additive
+    ctx.fillStyle = glow1;
     ctx.beginPath();
-    ctx.ellipse(auraCenterX, auraCenterY, auraRadius, auraRadius * 0.8, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.arc(auraCenterX, auraCenterY, outerRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Layer 2: Core intensity (The "source")
+    // Only visible if strictly needed, or very subtle close to body
+    const innerRadius = bodyW * 0.8 + 10 * auraRatio;
+    const glow2 = ctx.createRadialGradient(auraCenterX, auraCenterY, 0, auraCenterX, auraCenterY, innerRadius);
+    glow2.addColorStop(0, `rgba(255, 255, 255, ${currentAlpha * 0.8})`);
+    glow2.addColorStop(1, `rgba(${auraRgb.r}, ${auraRgb.g}, ${auraRgb.b}, 0)`);
+
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.fillStyle = glow2;
+    ctx.beginPath();
+    ctx.arc(auraCenterX, auraCenterY, innerRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // No hard stroke anymore
     ctx.restore();
 
     ctx.save();
