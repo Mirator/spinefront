@@ -46,10 +46,8 @@ export function applyPlayerAuraHit(player, state) {
     return true;
   }
 
-  const burden = Math.max(0, (state.currency || 0) - AURA.recoveryGoldThreshold);
-  const burdenLoss = burden * AURA.burdenHitBonus;
   const nextAura = clamp(
-    (player.aura ?? player.maxAura ?? AURA.max) - (AURA.hitLoss + burdenLoss),
+    (player.aura ?? player.maxAura ?? AURA.max) - AURA.hitLoss,
     0,
     player.maxAura || AURA.max,
   );
@@ -68,36 +66,17 @@ export function updateAuraRecovery(player, state, baseWorld, world, dt) {
   player.auraHitCooldown = Math.max(0, (player.auraHitCooldown || 0) - dt);
   player.auraRecoverDelay = Math.max(0, (player.auraRecoverDelay || 0) - dt);
 
-  const instabilityResist = 1 - (state.relicModifiers?.instabilityResist || 0);
-  const excessGold = Math.max(0, (state.currency || 0) - AURA.instabilityGoldFloor);
-  if (excessGold > 0) {
-    player.auraRecoverDelay += excessGold * AURA.instabilityDelayPerGold * instabilityResist * dt;
-    const overload = Math.max(0, (state.currency || 0) - AURA.instabilityGoldCeiling);
-    const instabilityDrain =
-      excessGold * AURA.instabilityDrainPerGold * instabilityResist * dt +
-      overload * AURA.instabilityDrainPerGold * 0.25 * instabilityResist * dt;
-    if (instabilityDrain > 0) {
-      player.aura = clamp((player.aura || 0) - instabilityDrain, 0, player.maxAura || AURA.max);
-      if (player.aura <= 0 && !player.critical) {
-        player.critical = true;
-        state.hudText = 'Aura destabilized — shed gold to stabilize.';
-      }
-    }
-  }
-
   const canRecover =
-    state.currency >= AURA.recoveryGoldThreshold &&
     isInOwnedTerritory(player, baseWorld, world) &&
     player.auraRecoverDelay <= 0;
   if (!canRecover) return;
 
   const recoveryBoost = 1 + (state.relicModifiers?.auraRecovery || 0);
-  const burdenPenalty = 1 + Math.max(0, (state.currency || 0) - AURA.recoveryGoldThreshold) * AURA.recoverBurdenPenalty;
-  const recoverRate = (AURA.recoverRate * recoveryBoost) / burdenPenalty;
+  const recoverRate = AURA.recoverRate * recoveryBoost;
   const restored = (player.aura || 0) + recoverRate * dt;
   player.aura = clamp(restored, 0, player.maxAura || AURA.max);
   if (player.critical && player.aura > AURA.criticalRecoveryBuffer) {
     player.critical = false;
-    state.hudText = 'Aura stabilized — spend gold to keep it steady.';
+    state.hudText = 'Aura stabilized — stay safe.';
   }
 }
