@@ -576,108 +576,126 @@ export function createRenderer({ canvas, colors = COLORS }) {
 
   function drawHUD(snapshot) {
     const { state, world, player, shrine } = snapshot;
-    const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
     const islandName = state.island?.bonus?.name || 'Skybound Outpost';
-    const shrineTech = state.shrineTech || { branches: { cadence: 0, power: 0 } };
-    const selection = shrineTech.selection || 'cadence';
-    const nextTier = (shrineTech.branches?.[selection] || 0) + 1;
-    const costIndex = Math.min(nextTier - 1, SHRINE_TECH.costs.length - 1);
-    const baseNextCost = SHRINE_TECH.costs[costIndex] ?? unlockCost();
-    const nextCost = nextTier === 1 ? Math.max(baseNextCost, ECONOMY.shrineCost) : baseNextCost;
-    const auraMax = player.maxAura || AURA.max;
-    const auraPercent = Math.round(clamp((player.aura ?? auraMax) / auraMax, 0, 1) * 100);
-    const burdenRatio = clamp(state.burdenRatio || 0, 0, 1);
-    const sprintSlow = Math.round(burdenRatio * GOLD_BURDEN.maxSprintSlow * 100);
-    const instabilityGold = Math.max(0, (state.currency || 0) - AURA.instabilityGoldFloor);
-    const hudLines = [
-      `Island ${state.islandLevel || 1}: ${islandName}`,
-      `Nights: ${state.nightsSurvived}/${world.nightsToWin}`,
-      `Gold: ${state.currency} (burden -${sprintSlow}% sprint${instabilityGold > 0 ? ', aura shaky' : ''})`,
-      `Legacy: ${state.legacy || 0}`,
-      `Aura: ${auraPercent}%${player.critical ? ' (critical!)' : ''} — recover inside walls with ${AURA.recoveryGoldThreshold}+ gold.`,
-    ];
-    if (state.island?.bonus?.description) {
-      hudLines.push(`Bonus: ${state.island.bonus.description}`);
-    }
-    const shrineLine = state.shrineUnlocked
-      ? `Shrine: ${branchLabel(selection)} — ${shrineTierSummary(shrineTech)}`
-      : nearShrine
-        ? `E: Unlock shrine (${nextCost} gold) — focus ${branchLabel(selection)} (up/down to switch)${state.currency < nextCost ? ' — need gold' : ''}`
-        : 'Shrine: Locked (approach to unlock)';
-    hudLines.push(shrineLine);
-    if (!state.isNight) {
-      hudLines.push(`Day build: Repair (-${ECONOMY.repairCost}) near walls/towers or E+↓ for barricade (-${ECONOMY.barricadeCost}).`);
-    }
-    if (state.jumpPuzzles?.length) {
-      const cleared = state.jumpPuzzles.filter((p) => p.state === 'completed' || p.state === 'resolved').length;
-      const available = state.jumpPuzzles.filter((p) => p.state === 'available').length;
-      hudLines.push(`Jump puzzles: ${cleared}/${state.jumpPuzzles.length} cleared, ${available} waiting (daytime only).`);
-      if (state.activePuzzle) {
-        const remaining = Math.max(0, state.activePuzzle.timer || 0).toFixed(1);
-        hudLines.push(`Puzzle climb: ${state.activePuzzle.jumpsDone}/${state.activePuzzle.requiredJumps} jumps — ${remaining}s left.`);
-      }
-      if (state.pendingPuzzleReward) {
-        hudLines.push(
-          `Puzzle reward ready: ${state.puzzleRewardSelection} (up/down to switch, interact near beacon to claim).`,
-        );
-      }
-    }
-    if (burdenRatio > 0.4) {
-      hudLines.push('Gold is heavy — drop some (Interact+↓) to calm your aura.');
-    }
-    if (state.isNight && state.waveDescriptors?.length) {
-      const preview = state.waveDescriptors.slice(0, 3);
-      const summary = preview
-        .map((d) => `${d.side === 'left' ? 'L' : 'R'}-${d.enemyType}${d.burst ? '!' : ''}`)
-        .join(' | ');
-      hudLines.push(`Next wave: ${summary}`);
-    }
-    if (state.pendingAscend) {
-      hudLines.push('Ascend ready: open the menu to climb.');
-    }
-    if (state.hudText) {
-      hudLines.push(state.hudText);
+    const padding = 12;
+    const itemGap = 24;
+
+    // Top Right Status Bar
+    ctx.save();
+    ctx.font = '700 16px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+
+    // Calculate widths for layout
+    const goldText = `${state.currency}`;
+    const nightsText = `${state.nightsSurvived}/${world.nightsToWin}`;
+    const legacyText = `${state.legacy || 0}`;
+
+    const goldWidth = ctx.measureText(goldText).width + 24;
+    const nightsWidth = ctx.measureText(nightsText).width + 24;
+    const legacyWidth = ctx.measureText(legacyText).width + 24;
+
+    const totalWidth = goldWidth + nightsWidth + legacyWidth + padding * 2;
+    const barHeight = 40;
+    const x = canvas.width - totalWidth - 12;
+    const y = 12;
+
+    // Background
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    drawRoundedRect(ctx, x, y, totalWidth, barHeight, 20);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    let curX = x + padding;
+    const centerY = y + barHeight / 2;
+
+    // Gold Icon & Text
+    ctx.beginPath();
+    ctx.arc(curX + 8, centerY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#fcd34d'; // Gold color
+    ctx.fill();
+    ctx.fillStyle = '#fef3c7';
+    ctx.textAlign = 'left';
+    ctx.fillText(goldText, curX + 20, centerY);
+    curX += goldWidth;
+
+    // Legacy Icon & Text
+    if (state.legacy > 0) {
+      ctx.save();
+      ctx.translate(curX + 8, centerY);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#60a5fa'; // Blue diamond
+      ctx.fillRect(-4, -4, 8, 8);
+      ctx.restore();
+      ctx.fillStyle = '#dbeafe';
+      ctx.fillText(legacyText, curX + 20, centerY);
+      curX += legacyWidth;
     }
 
-    ctx.save();
-    const padding = 12;
-    const maxWidth = 340;
-    const lineHeight = 18;
-    const blockHeight = padding * 2 + hudLines.length * lineHeight;
-    const x = canvas.width - maxWidth - 12;
-    const y = 12;
-    ctx.globalAlpha = 0.82;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-    drawRoundedRect(ctx, x, y, maxWidth, blockHeight, 10);
+    // Nights Icon & Text
+    ctx.beginPath();
+    ctx.arc(curX + 8, centerY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = state.isNight ? '#818cf8' : '#fbbf24'; // Moon/Sun color
     ctx.fill();
-    ctx.globalAlpha = 1;
+    if (state.isNight) {
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(curX + 10, centerY - 2, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = '#e5e7eb';
-    ctx.font = '14px Inter, system-ui, sans-serif';
-    ctx.textBaseline = 'top';
-    hudLines.forEach((line, idx) => {
-      ctx.fillText(line, x + padding, y + padding + idx * lineHeight);
-    });
+    ctx.fillText(nightsText, curX + 20, centerY);
+
+    ctx.restore();
+
+    // Contextual Prompts (Minimalist)
+    ctx.save();
+    ctx.font = '600 13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+
+    // Shrine Interaction
+    const nearShrine = player.x + player.w > shrine.x - 18 && player.x < shrine.x + shrine.w + 18;
+    if (nearShrine && !state.shrineUnlocked) {
+      const unlockCost = Math.max(SHRINE_TECH.costs[0] ?? ECONOMY.shrineCost, ECONOMY.shrineCost);
+      const canAfford = state.currency >= unlockCost;
+
+      const px = player.x + player.w / 2;
+      const py = player.y - 40;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      drawRoundedRect(ctx, px - 60, py - 30, 120, 26, 13);
+      ctx.fill();
+
+      ctx.fillStyle = canAfford ? '#34d399' : '#f87171';
+      ctx.fillText(`[E] Unlock ${unlockCost}`, px, py - 13);
+    }
+
+    // Puzzle Interaction
+    if (state.pendingPuzzleReward) {
+      const px = player.x + player.w / 2;
+      const py = player.y - 60;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      drawRoundedRect(ctx, px - 80, py - 24, 160, 24, 12);
+      ctx.fill();
+      ctx.fillStyle = '#f472b6';
+      ctx.fillText(`[E] Claim Reward`, px, py - 8);
+    }
+
     ctx.restore();
   }
 
   function drawHelpBar() {
-    ctx.save();
-    ctx.font = '13px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillStyle = 'rgba(229, 231, 235, 0.9)';
-    ctx.fillText('Move: A/D | Jump: Space | Attack: F | Interact/Drop: E | Menu: Esc', canvas.width / 2, canvas.height - 12);
-    ctx.restore();
+    // Intentionally empty - removing persistent help text
   }
 
   function drawMobileHint() {
+    if (!isTouchViewport()) return;
     ctx.save();
-    ctx.font = '13px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillStyle = 'rgba(229, 231, 235, 0.9)';
-    const text = 'Mobile: Drag left pad to move; tap Jump, Attack, or Interact on the right.';
-    ctx.fillText(text, canvas.width / 2, canvas.height - 12);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    // Simple visualize touch zones if needed, or just keep it clean
     ctx.restore();
   }
 
@@ -712,97 +730,120 @@ export function createRenderer({ canvas, colors = COLORS }) {
       return;
     }
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    // Backdrop
+    ctx.fillStyle = 'rgba(11, 19, 43, 0.85)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const panelWidth = Math.min(520, canvas.width - 40);
-    const panelHeight = 380;
-    const panelX = (canvas.width - panelWidth) / 2;
-    const panelY = (canvas.height - panelHeight) / 2;
+    // Pattern or vignette
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const gradient = ctx.createRadialGradient(cx, cy, 100, cx, cy, canvas.width * 0.8);
+    gradient.addColorStop(0, 'rgba(11, 19, 43, 0)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = 'rgba(17, 24, 39, 0.9)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1.5;
-    drawRoundedRect(ctx, panelX, panelY, panelWidth, panelHeight, 16);
-    ctx.fill();
-    ctx.stroke();
+    const isStart = state.menuStatus === 'Start' || state.menuStatus === 'Intro';
 
-    ctx.fillStyle = '#fbbf24';
-    ctx.font = '12px Inter, system-ui, sans-serif';
-    ctx.textBaseline = 'top';
-    ctx.fillText((state.menuStatus || 'Run paused').toUpperCase(), panelX + 18, panelY + 16);
+    // Main Title
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fde047';
+    ctx.shadowColor = '#f59e0b';
+    ctx.shadowBlur = 20;
+    ctx.font = '800 64px Inter, system-ui, sans-serif';
+    ctx.fillText('SPINEFRONT', cx, cy - 80);
 
-    ctx.fillStyle = '#e5e7eb';
-    ctx.font = '22px Inter, system-ui, sans-serif';
-    ctx.fillText('Hold the Outpost', panelX + 18, panelY + 36);
-
+    // Subtitle / Status
+    ctx.shadowBlur = 0;
     ctx.fillStyle = '#9ca3af';
-    ctx.font = '14px Inter, system-ui, sans-serif';
-    const message = state.menuMessage || 'Survive 3 nights and secure the shrine.';
-    ctx.fillText(message, panelX + 18, panelY + 64);
+    ctx.font = '500 20px Inter, system-ui, sans-serif';
+    const subTitle = isStart ? 'HOLD THE OUTPOST' : 'PAUSED';
+    ctx.fillText(subTitle, cx, cy - 40);
 
-    if (state.island?.bonus?.name) {
-      ctx.fillStyle = '#a5f3fc';
-      ctx.font = '13px Inter, system-ui, sans-serif';
-      ctx.fillText(
-        `Island bonus: ${state.island.bonus.name} — ${state.island.bonus.description || ''}`,
-        panelX + 18,
-        panelY + 84,
-      );
-    }
+    // Button
+    const startLabel = state.menuStartLabel || (isStart ? 'START' : 'RESUME');
+    const buttonW = 220;
+    const buttonH = 56;
+    const bx = cx - buttonW / 2;
+    const by = cy + 40;
 
-    ctx.font = '13px Inter, system-ui, sans-serif';
-    const items = [
-      'Endure 3 nights to ascend.',
-      'Defend walls, repair in daylight.',
-      'Gold heals inside walls but slows you when hoarded.',
-      shrineHelpCopy(),
-    ];
-    items.forEach((line, idx) => {
-      ctx.fillText(`• ${line}`, panelX + 18, panelY + 110 + idx * 18);
-    });
+    interactiveRegions.menuStart = { x: bx, y: by, w: buttonW, h: buttonH };
 
-    const startLabel = state.menuStartLabel || 'Start run';
-    const buttonWidth = Math.max(190, ctx.measureText(startLabel).width + 32);
-    const buttonHeight = 42;
-    const buttonX = panelX + panelWidth - buttonWidth - 18;
-    const buttonY = panelY + panelHeight - buttonHeight - 18;
-    interactiveRegions.menuStart = { x: buttonX, y: buttonY, w: buttonWidth, h: buttonHeight };
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.85)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    drawRoundedRect(ctx, buttonX, buttonY, buttonWidth, buttonHeight, 12);
+    // Button Glow
+    const bgGlow = ctx.createLinearGradient(bx, by, bx, by + buttonH);
+    bgGlow.addColorStop(0, '#3b82f6');
+    bgGlow.addColorStop(1, '#2563eb');
+
+    ctx.fillStyle = bgGlow;
+    ctx.shadowColor = 'rgba(59, 130, 246, 0.5)';
+    ctx.shadowBlur = 15;
+    drawRoundedRect(ctx, bx, by, buttonW, buttonH, 28);
     ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#f9fafb';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(startLabel, buttonX + 16, buttonY + buttonHeight / 2);
 
-    ctx.fillStyle = '#e5e7eb';
-    const actions = ['Menu: Esc', 'Restart: R', 'Mobile: move left pad, actions on right'];
-    const actionsStartY = panelY + 110 + items.length * 18 + 12;
-    actions.forEach((line, idx) => {
-      ctx.fillText(line, panelX + 18, actionsStartY + idx * 18);
-    });
+    // Button Text
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 20px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(startLabel, cx, by + buttonH / 2);
+
+    // Footer Controls
+    ctx.fillStyle = '#64748b';
+    ctx.font = '14px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('WASD / ARROWS to Move  •  SPACE to Jump  •  F to Attack  •  E to Interact', cx, canvas.height - 30);
+
     ctx.restore();
   }
 
   function drawOutcome(state, world) {
     if (!state.ended) return;
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+
+    // Dramatic Overlay
+    const overlayColor = state.playerFallen ? 'rgba(50, 0, 0, 0.85)' : 'rgba(0, 50, 30, 0.85)';
+    ctx.fillStyle = overlayColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const lossColor = state.playerFallen ? '#f87171' : '#34d399';
-    ctx.fillStyle = lossColor;
-    ctx.font = '28px Inter, system-ui, sans-serif';
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    // Victory/Defeat Title
+    const title = state.playerFallen ? 'DEFEAT' : 'VICTORY';
+    const color = state.playerFallen ? '#f87171' : '#34d399';
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const message = state.playerFallen ? 'Aura collapsed — you were cast from the island.' : 'Victory! Dawn rises and you endure.';
-    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
-    ctx.font = '16px Inter, system-ui, sans-serif';
+    ctx.font = '900 80px Inter, system-ui, sans-serif';
+
+    // Text Shadow
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = color;
+    ctx.fillText(title, cx, cy - 60);
+
+    // Subtext
+    ctx.shadowBlur = 0;
+    ctx.font = '500 24px Inter, system-ui, sans-serif';
     ctx.fillStyle = '#e5e7eb';
-    const sub = 'Press Enter to continue or R to restart';
-    ctx.fillText(sub, canvas.width / 2, canvas.height / 2 + 28);
+    const sub = state.playerFallen
+      ? 'Your aura has collapsed.'
+      : 'The dawn has arrived.';
+    ctx.fillText(sub, cx, cy + 20);
+
+    // Stats
+    ctx.font = '16px Inter, system-ui, sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    const stats = `Nights: ${state.nightsSurvived}  •  Gold: ${state.currency}  •  Legacy: ${state.legacy || 0}`;
+    ctx.fillText(stats, cx, cy + 60);
+
+    // Restart Prompt
+    ctx.font = '600 16px Inter, system-ui, sans-serif';
+    ctx.fillStyle = '#fcd34d';
+    ctx.fillText('Press [R] to Restart', cx, cy + 120);
+
     ctx.restore();
+
   }
 
   function drawParallax(ctx, camera, factor, color, offsetY, seed) {
