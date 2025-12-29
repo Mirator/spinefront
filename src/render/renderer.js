@@ -753,19 +753,12 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.font = '800 64px Inter, system-ui, sans-serif';
     ctx.fillText('SPINEFRONT', cx, cy - 80);
 
-    // Subtitle / Status
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#9ca3af';
-    ctx.font = '500 20px Inter, system-ui, sans-serif';
-    const subTitle = isStart ? 'HOLD THE OUTPOST' : 'PAUSED';
-    ctx.fillText(subTitle, cx, cy - 40);
-
     // Button
     const startLabel = state.menuStartLabel || (isStart ? 'START' : 'RESUME');
     const buttonW = 220;
-    const buttonH = 56;
+    const buttonH = 64; // Slightly larger button
     const bx = cx - buttonW / 2;
-    const by = cy + 40;
+    const by = cy + 60; // Moved down to make room for description
 
     interactiveRegions.menuStart = { x: bx, y: by, w: buttonW, h: buttonH };
 
@@ -783,15 +776,48 @@ export function createRenderer({ canvas, colors = COLORS }) {
     // Button Text
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#ffffff';
-    ctx.font = '700 20px Inter, system-ui, sans-serif';
+    ctx.font = '700 24px Inter, system-ui, sans-serif'; // Larger text
     ctx.textBaseline = 'middle';
     ctx.fillText(startLabel, cx, by + buttonH / 2);
 
-    // Footer Controls
+    // About the Game & Instructions
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '500 16px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+
+    const aboutY = cy - 40;
+    ctx.fillText('Defend the outpost. Manage aura. Survive the night.', cx, aboutY);
+
+    // Footer Controls (Enhanced)
+    const controlsY = canvas.height - 50;
     ctx.fillStyle = '#64748b';
     ctx.font = '14px Inter, system-ui, sans-serif';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('WASD / ARROWS to Move  •  SPACE to Jump  •  F to Attack  •  E to Interact', cx, canvas.height - 30);
+    ctx.textBaseline = 'middle';
+
+    // Draw controls with icons/visuals if possible, or just cleaner text
+    const controls = [
+      'WASD / ARROWS to Move',
+      'SPACE to Jump',
+      'F to Attack',
+      'E to Interact'
+    ];
+
+    const controlWidths = controls.map(c => ctx.measureText(c).width);
+    const totalControlWidth = controlWidths.reduce((a, b) => a + b, 0) + (controls.length - 1) * 40;
+    let controlX = cx - totalControlWidth / 2;
+
+    controls.forEach((text, i) => {
+      ctx.fillText(text, controlX + controlWidths[i] / 2, controlsY);
+      controlX += controlWidths[i];
+      if (i < controls.length - 1) {
+        ctx.fillStyle = '#475569';
+        ctx.beginPath();
+        ctx.arc(controlX + 20, controlsY, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#64748b';
+        controlX += 40;
+      }
+    });
 
     ctx.restore();
   }
