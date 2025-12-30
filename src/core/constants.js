@@ -92,12 +92,27 @@ export const COLORS = {
 export const PUZZLES = {
   count: 2,
   interactionRange: 48,
-  requiredJumps: 3,
-  timeLimit: 12,
-  timeCostMultiplier: 1.6,
-  failTimePenalty: 6,
-  goldReward: 8,
-  legacyReward: 1,
+  types: ['sky_climb', 'dodge_pulse', 'energy_channel'],
+  difficulty: {
+    easy: { nightsRequired: 0, goldReward: 5, legacyReward: 0, relicChance: 0 },
+    medium: { nightsRequired: 1, goldReward: 10, legacyReward: 1, relicChance: 0.2 },
+    hard: { nightsRequired: 2, goldReward: 18, legacyReward: 2, relicChance: 0.6 },
+  },
+  skyClimb: {
+    easy: { platforms: 3, timeLimit: 8, platformWidth: 80 },
+    medium: { platforms: 5, timeLimit: 10, platformWidth: 60 },
+    hard: { platforms: 7, timeLimit: 12, platformWidth: 40 },
+  },
+  dodgePulse: {
+    easy: { pulses: 3, pulseInterval: 2.0, pulseSpeed: 80 },
+    medium: { pulses: 5, pulseInterval: 1.5, pulseSpeed: 120 },
+    hard: { pulses: 7, pulseInterval: 1.0, pulseSpeed: 160 },
+  },
+  energyChannel: {
+    easy: { duration: 4, driftSpeed: 30, zoneWidth: 60 },
+    medium: { duration: 6, driftSpeed: 50, zoneWidth: 50 },
+    hard: { duration: 8, driftSpeed: 70, zoneWidth: 40 },
+  },
   relicOptions: ['steady_aura', 'lightfoot', 'damping_field'],
 };
 
