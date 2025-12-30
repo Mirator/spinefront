@@ -463,44 +463,211 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
-  function drawJumpPuzzles(puzzles = [], activePuzzle, camera, world) {
+  function drawJumpPuzzles(puzzles = [], activePuzzle, activeMiniGame, camera, world) {
     if (!puzzles?.length || !world) return;
+
+    // Draw inactive puzzles as monoliths
     puzzles.forEach((puzzle) => {
+      // Hide resolved puzzles
+      if (puzzle.state === 'resolved') return;
+
+      const isActive = activePuzzle?.id === puzzle.id;
       const status = puzzle.state;
-      const base =
-        status === 'completed' || status === 'resolved'
-          ? '#34d399'
-          : status === 'failed'
-            ? '#f87171'
-            : colors.beacon;
-      const x = puzzle.x - 10;
-      const topY = world.ground - 120;
-      const height = 110;
+
+      // Color based on status
+      let base = colors.beacon;
+      if (status === 'completed') base = '#34d399';
+      if (isActive) base = '#fde047';
+
+      const monolithWidth = 24;
+      const monolithHeight = 100;
+      const x = puzzle.x - monolithWidth / 2;
+      const topY = world.ground - monolithHeight - 20;
+
       ctx.save();
-      ctx.fillStyle = shadeColor(base, -0.2);
-      drawRoundedRect(ctx, x + 4, topY + 8, 12, height, 6);
+
+      // Shadow
+      ctx.fillStyle = shadeColor(base, -0.3);
+      drawRoundedRect(ctx, x + 4, topY + 8, monolithWidth, monolithHeight, 8);
       ctx.fill();
-      ctx.fillStyle = base;
-      drawRoundedRect(ctx, x, topY, 12, height, 8);
+
+      // Main body
+      const gradient = ctx.createLinearGradient(x, topY, x, topY + monolithHeight);
+      gradient.addColorStop(0, shadeColor(base, 0.2));
+      gradient.addColorStop(1, base);
+      ctx.fillStyle = gradient;
+      drawRoundedRect(ctx, x, topY, monolithWidth, monolithHeight, 10);
       ctx.fill();
-      if (activePuzzle?.id === puzzle.id) {
-        ctx.fillStyle = '#fde047';
-        ctx.beginPath();
-        ctx.arc(x + 6, topY - 12, 6, 0, Math.PI * 2);
-        ctx.fill();
+
+      // Glow for active
+      if (isActive) {
+        ctx.shadowColor = '#fde047';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
       }
+
+      // Type icon at top
       ctx.fillStyle = '#0b1120';
+      const iconY = topY + 20;
+      if (puzzle.type === 'sky_climb') {
+        // Arrow up icon
+        ctx.beginPath();
+        ctx.moveTo(puzzle.x, iconY - 8);
+        ctx.lineTo(puzzle.x + 6, iconY);
+        ctx.lineTo(puzzle.x - 6, iconY);
+        ctx.closePath();
+        ctx.fill();
+      } else if (puzzle.type === 'dodge_pulse') {
+        // Concentric circles icon
+        ctx.beginPath();
+        ctx.arc(puzzle.x, iconY, 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(puzzle.x, iconY, 3, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (puzzle.type === 'energy_channel') {
+        // Square icon
+        ctx.fillRect(puzzle.x - 5, iconY - 5, 10, 10);
+      }
+
+      // Label
+      ctx.fillStyle = '#e5e7eb';
       ctx.font = '10px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      const label =
-        status === 'completed' || status === 'resolved'
-          ? 'Cleared'
-          : status === 'failed'
-            ? 'Failed'
-            : 'Puzzle';
-      ctx.fillText(label, x + 6, topY + height + 10);
+      const typeLabels = {
+        sky_climb: 'Climb',
+        dodge_pulse: 'Dodge',
+        energy_channel: 'Channel',
+      };
+      const label = status === 'completed' ? 'Claim' : typeLabels[puzzle.type] || 'Trial';
+      ctx.fillText(label, puzzle.x, topY + monolithHeight + 14);
+
       ctx.restore();
     });
+
+    // Draw active mini-game visuals
+    if (activeMiniGame && activePuzzle) {
+      drawActiveMiniGame(activeMiniGame, world);
+    }
+  }
+
+  function drawActiveMiniGame(miniGame, world) {
+    if (!miniGame) return;
+
+    ctx.save();
+
+    if (miniGame.type === 'sky_climb') {
+      // Draw platforms
+      for (const plat of miniGame.platforms || []) {
+        const gradient = ctx.createLinearGradient(plat.x, plat.y, plat.x, plat.y + plat.h);
+        gradient.addColorStop(0, '#60a5fa');
+        gradient.addColorStop(1, '#3b82f6');
+        ctx.fillStyle = gradient;
+        drawRoundedRect(ctx, plat.x, plat.y, plat.w, plat.h, 4);
+        ctx.fill();
+
+        // Glow
+        ctx.shadowColor = '#60a5fa';
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = '#93c5fd';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      // Draw goal line
+      if (miniGame.goalY) {
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 4]);
+        ctx.beginPath();
+        ctx.moveTo(miniGame.platforms[0]?.x - 40 || 100, miniGame.goalY);
+        ctx.lineTo((miniGame.platforms[0]?.x || 100) + 120, miniGame.goalY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Goal label
+        ctx.fillStyle = '#34d399';
+        ctx.font = '12px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('GOAL', (miniGame.platforms[0]?.x || 100) + 130, miniGame.goalY + 4);
+      }
+
+      // Timer display
+      if (miniGame.timer !== undefined) {
+        const timerX = miniGame.platforms[0]?.x || 200;
+        ctx.fillStyle = miniGame.timer < 3 ? '#f87171' : '#fde047';
+        ctx.font = '700 16px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${miniGame.timer.toFixed(1)}s`, timerX + 20, miniGame.goalY - 20);
+      }
+    } else if (miniGame.type === 'dodge_pulse') {
+      // Draw pulse rings
+      for (const pulse of miniGame.pulses || []) {
+        const alpha = 1 - pulse.radius / pulse.maxRadius;
+        ctx.strokeStyle = `rgba(248, 113, 113, ${alpha})`;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(miniGame.centerX, miniGame.centerY, pulse.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner glow
+        ctx.strokeStyle = `rgba(254, 202, 202, ${alpha * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(miniGame.centerX, miniGame.centerY, pulse.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Draw center marker
+      ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.arc(miniGame.centerX, miniGame.centerY, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pulse counter
+      ctx.fillStyle = '#e5e7eb';
+      ctx.font = '14px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `${miniGame.pulsesFired || 0}/${miniGame.pulseCount || 0}`,
+        miniGame.centerX,
+        miniGame.centerY - 50,
+      );
+    } else if (miniGame.type === 'energy_channel') {
+      // Draw channeling zone
+      const zoneX = miniGame.zoneX - miniGame.zoneWidth / 2;
+      const zoneY = world.ground - 60;
+      const zoneHeight = 50;
+
+      // Zone background
+      ctx.fillStyle = 'rgba(96, 165, 250, 0.3)';
+      ctx.fillRect(zoneX, zoneY, miniGame.zoneWidth, zoneHeight);
+
+      // Zone border
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(zoneX, zoneY, miniGame.zoneWidth, zoneHeight);
+
+      // Progress bar
+      const progressRatio = miniGame.channelProgress / miniGame.duration;
+      ctx.fillStyle = '#34d399';
+      ctx.fillRect(zoneX, zoneY - 10, miniGame.zoneWidth * progressRatio, 6);
+      ctx.strokeStyle = '#0b1120';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(zoneX, zoneY - 10, miniGame.zoneWidth, 6);
+
+      // Timer
+      ctx.fillStyle = miniGame.timer < 2 ? '#f87171' : '#e5e7eb';
+      ctx.font = '14px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${miniGame.timer.toFixed(1)}s`, miniGame.zoneX, zoneY - 20);
+    }
+
+    ctx.restore();
   }
 
   function drawCelestials(state, world, camera) {
@@ -1158,7 +1325,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.translate(-activeCamera.x, -activeCamera.y);
     drawShrine(shrine, state.shrineUnlocked);
     drawStructures(walls, towers, barricades);
-    drawJumpPuzzles(state.jumpPuzzles, state.activePuzzle, activeCamera, world);
+    drawJumpPuzzles(state.jumpPuzzles, state.activePuzzle, state.activeMiniGame, activeCamera, world);
     drawEnemies(enemies);
     drawProjectiles(projectiles);
     drawProjectiles(enemyProjectiles);

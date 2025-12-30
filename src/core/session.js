@@ -207,7 +207,7 @@ export class GameSession {
       updateSwordCollision(this.store.player, state.enemies, swordCallbacks);
     }
 
-    updateJumpPuzzles(state, this.store.player, world, scaledDt);
+    updateJumpPuzzles(state, this.store.player, this.store.input, world, scaledDt);
     updatePlayer(this.store.player, world, scaledDt, this.store.shrine);
     updateCamera(this.store.camera, this.store.player, world);
     resolveEnemyAttacks(

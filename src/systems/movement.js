@@ -180,7 +180,7 @@ export function applyInputToPlayer(player, input, state, shrine, towers, walls, 
     if (state.pendingPuzzleReward === nearPuzzle.id) {
       applyPuzzleReward(state, nearPuzzle.id);
     } else {
-      startJumpPuzzle(state, nearPuzzle.id);
+      startJumpPuzzle(state, nearPuzzle.id, world);
     }
   } else if (tryInteract && !state.isNight) {
     const structures = [...walls, ...towers];
