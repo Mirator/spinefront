@@ -46,7 +46,13 @@ export function createRenderer({ canvas, colors = COLORS }) {
   const interactiveRegions = {
     menuToggle: null,
     menuStart: null,
+    fpsButton: null,
   };
+
+  let lastFpsUpdate = 0;
+  let frameCount = 0;
+  let currentFps = 0;
+  let lastFrameTime = performance.now();
   const mobileQueries = [
     '(max-width: 640px)',
     '(pointer: coarse) and (orientation: landscape) and (max-height: 520px)',
@@ -1060,6 +1066,38 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.stroke();
     ctx.fillStyle = state.menuOpen ? '#fbbf24' : '#bfdbfe';
     ctx.textBaseline = 'middle';
+    ctx.restore();
+  }
+
+  function drawFPSButton() {
+    const now = performance.now();
+    frameCount++;
+    if (now - lastFpsUpdate > 1000) {
+      currentFps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+      lastFpsUpdate = now;
+      frameCount = 0;
+    }
+
+    const paddingX = 12;
+    const text = `FPS: ${currentFps}`;
+    ctx.save();
+    ctx.font = '12px Inter, system-ui, sans-serif';
+    const textWidth = ctx.measureText(text).width;
+    const w = textWidth + paddingX * 2;
+    const h = 28;
+    const x = 14;
+    const y = 56; // Below menu toggle (14 + 14 + 28)
+    interactiveRegions.fpsButton = { x, y, w, h };
+
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.6)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    drawRoundedRect(ctx, x, y, w, h, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.textBaseline = 'middle';
     ctx.fillText(text, x + paddingX, y + h / 2);
     ctx.restore();
   }
@@ -1497,6 +1535,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     drawEdgeWarnings(state.effects, activeCamera);
     drawHUD(snapshot);
     drawMenuToggle(state);
+    drawFPSButton();
     const touchControlsActive = isTouchViewport();
     if (touchControlsActive) {
       drawMobileHint();
