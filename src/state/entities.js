@@ -70,12 +70,16 @@ export function createTower(x, world, modifiers = {}) {
 }
 
 export function createShrine(world) {
+  const widthRatio = world.width / 960;
+  const baseX = typeof BASE_POSITIONS.shrine === 'number' ? BASE_POSITIONS.shrine : 480;
   return {
     type: 'shrine',
-    x: world.width / 2 - 25,
+    x: baseX * widthRatio - 25,
     y: world.ground - 50,
     w: 50,
     h: 50,
+    hp: 200,
+    maxHp: 200,
   };
 }
 

@@ -69,9 +69,10 @@ export const SHRINE_TECH = {
 };
 
 export const BASE_POSITIONS = {
-  walls: [432, 528],
-  towers: [454, 506],
-  player: 468,
+  walls: [450, 510],
+  towers: [462, 498],
+  player: 480,
+  shrine: 480,
 };
 
 export const COLORS = {
@@ -139,3 +140,31 @@ export const INTERACTION_CONFIG = {
   repairRange: 42,
   repairAmount: 30,
 };
+
+export const UI_COLORS = {
+  hintBackground: 'rgba(251, 191, 36, 0.9)', // Amber
+  hintText: '#0f172a',
+  bannerBackground: 'rgba(15, 23, 42, 0.9)',
+  bannerText: '#e2e8f0',
+  waveTimerFill: '#C084FC',
+  waveTimerText: '#e9d5ff',
+  duskTint: 'rgba(220, 38, 38, 0.15)',
+  duskBannerBg: '#fecaca',
+  duskBannerShadow: '#dc2626',
+  duskBannerTextMain: '#fecaca',
+  duskBannerTextSub: '#f87171',
+  outcomeDefeat: '#f87171',
+  outcomeVictory: '#34d399',
+  outcomeReviewRed: 'rgba(50, 0, 0, 0.85)',
+  outcomeReviewGreen: 'rgba(0, 50, 30, 0.85)',
+  outcomeText: '#e5e7eb',
+  outcomeStats: '#94a3b8',
+  outcomeRestart: '#fcd34d',
+};
+
+export const HINT_CONFIG = {
+  proximityRadius: 100,
+  bannerDuration: 4,
+};
+
+export const DUSK_THRESHOLD = 0.92;

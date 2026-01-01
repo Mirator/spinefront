@@ -10,6 +10,7 @@ import { deriveWaveDefinition } from '../state/waves.js';
 import { createIslandContext } from '../state/islands.js';
 import { applyPlayerAuraHit, updateAuraRecovery } from '../systems/aura.js';
 import { applyPuzzleReward, updateJumpPuzzles } from '../systems/puzzles.js';
+import { updateHints } from '../systems/hints.js';
 
 describe('game logic systems', () => {
   it('awards currency per cycle and ends after enough nights', () => {
@@ -427,5 +428,84 @@ describe('game logic systems', () => {
     expect(store.camera.w).toBe(previousCamera.w);
     expect(store.camera.h).toBe(previousCamera.h);
     expect(store.camera.y).toBe(store.world.height - store.camera.h);
+  });
+  describe('shrine mechanics', () => {
+    it('initializes shrine with HP', () => {
+      const store = createGameStore();
+      expect(store.shrine.hp).toBeGreaterThan(0);
+      expect(store.shrine.maxHp).toBeGreaterThan(0);
+    });
+
+    it('triggers game over when shrine is destroyed', () => {
+      const store = createGameStore();
+      const { state, world, shrine } = store;
+
+      expect(checkEndConditions(state, world, shrine)).toBeNull();
+
+      shrine.hp = 0;
+      const result = checkEndConditions(state, world, shrine);
+
+      expect(state.shrineDestroyed).toBe(true);
+      expect(state.ended).toBe(true);
+      expect(result).toBe('loss');
+    });
+  });
+
+  describe('dusk mechanics', () => {
+    it('activates dusk warning during late day', () => {
+      const store = createGameStore();
+      store.state.isNight = false;
+      store.state.dayTimer = store.world.dayLength * 0.95; // 95% of day
+
+      updateDayNight(store.state, store.world, 0);
+      expect(store.state.duskWarning).toBe(true);
+    });
+
+    it('clears warning when night falls', () => {
+      const store = createGameStore();
+      store.state.isNight = true;
+      store.state.dayTimer = 0;
+
+      updateDayNight(store.state, store.world, 0);
+      expect(store.state.duskWarning).toBe(false);
+    });
+
+    it('shows no warning during early day', () => {
+      const store = createGameStore();
+      store.state.dayTimer = store.world.dayLength * 0.5;
+
+      updateDayNight(store.state, store.world, 0);
+      expect(store.state.duskWarning).toBe(false);
+    });
+  });
+
+  describe('hint mechanics', () => {
+    it('sets objective banner at start of day', () => {
+      const store = createGameStore();
+      store.state.isNight = false;
+      store.state.dayTimer = 0;
+
+      updateHints(store.state, store.player, store.world, 0.1, store.shrine);
+      expect(store.state.hints.objectiveBanner).not.toBeNull();
+      expect(store.state.hints.objectiveBanner.text).toMatch(/Prepare your defenses/);
+    });
+
+    it('shows proximity hint near shrine', () => {
+      const store = createGameStore();
+      store.player.x = store.shrine.x;
+      store.player.y = store.shrine.y - 40;
+
+      updateHints(store.state, store.player, store.world, 0.1, store.shrine);
+      expect(store.state.hints.activeHint).not.toBeNull();
+      expect(store.state.hints.activeHint.text).toMatch(/Upgrade Towers/);
+    });
+
+    it('clears active hint when walking away', () => {
+      const store = createGameStore();
+      store.player.x = store.shrine.x + 500;
+
+      updateHints(store.state, store.player, store.world, 0.1, store.shrine);
+      expect(store.state.hints.activeHint).toBeNull();
+    });
   });
 });

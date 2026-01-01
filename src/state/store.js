@@ -7,6 +7,7 @@ import { createBarricade, createPlayer, createStructureSets, createWall, createT
 import { centerCameraOnPlayer, createCamera, resizeCamera } from './camera.js';
 import { createBaseModifiers, createIslandContext } from './islands.js';
 import { resetJumpPuzzles } from '../systems/puzzles.js';
+import { createHintState } from '../systems/hints.js';
 
 function applyAltitude(store) {
   const heightRatio = store.world.height / store.baseWorld.height;
@@ -50,9 +51,8 @@ export function createGameStore(dimensions = {}) {
     menuOpen: true,
     paused: true,
     menuStatus: 'Ready to deploy',
-    menuMessage: `${island.bonus?.name || 'Sky island'} — ${
-      island.bonus?.description || 'Survive 3 nights to ascend.'
-    }`,
+    menuMessage: `${island.bonus?.name || 'Sky island'} — ${island.bonus?.description || 'Survive 3 nights to ascend.'
+      }`,
     menuStartLabel: 'Start run',
     shrineUnlocked: false,
     shrineTech: {
@@ -89,6 +89,7 @@ export function createGameStore(dimensions = {}) {
     pendingPuzzleReward: null,
     puzzleRewardSelection: 'gold',
     puzzleSelectionHeld: false,
+    hints: createHintState(),
   };
 
   state.shrineUnlocked = state.learnedShrine || false;
@@ -146,6 +147,7 @@ function resetRunState(state, modifiers, world, { keepMenuOpen = false } = {}) {
   state.pendingPuzzleReward = null;
   state.puzzleRewardSelection = 'gold';
   state.puzzleSelectionHeld = false;
+  state.hints = createHintState();
   resetJumpPuzzles(state, world);
 
   state.shrineTech = {
@@ -210,9 +212,8 @@ export function resetGameStore(store, options = {}) {
   store.state.shrineTech.unlocked = store.state.shrineUnlocked;
   store.state.shrineTech.branches = { cadence: 0, power: 0 };
   store.state.menuStatus = `Island ${islandLevel}`;
-  store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${
-    store.state.island?.bonus?.description || 'Hold the line for three nights.'
-  }`;
+  store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${store.state.island?.bonus?.description || 'Hold the line for three nights.'
+    }`;
   store.state.menuStartLabel = 'Start run';
 
   resetInputState(store.input);
@@ -242,9 +243,8 @@ export function ascendGameStore(store) {
   store.state.shrineTech.unlocked = store.state.shrineUnlocked;
   store.state.shrineTech.branches = { cadence: 0, power: 0 };
   store.state.menuStatus = `Ascended to Island ${nextLevel}`;
-  store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${
-    store.state.island?.bonus?.description || ''
-  }`;
+  store.state.menuMessage = `${store.state.island?.bonus?.name || 'New island'} — ${store.state.island?.bonus?.description || ''
+    }`;
   store.state.menuStartLabel = 'Begin next island';
 
   resetInputState(store.input);

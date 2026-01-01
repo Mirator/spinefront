@@ -1,6 +1,8 @@
 import { ECONOMY } from '../core/constants.js';
 import { deriveWaveDefinition } from '../state/waves.js';
+import { DUSK_THRESHOLD } from '../core/constants.js';
 import { clamp } from './math.js';
+
 
 export function updateDayNight(state, world, dt) {
   const events = { becameNight: false, becameDay: false };
@@ -44,11 +46,17 @@ export function updateDayNight(state, world, dt) {
   }
 
   state.dayRatio = clamp(state.dayTimer / world.dayLength, 0, 1);
+  state.duskWarning = !state.isNight && state.dayRatio > DUSK_THRESHOLD;
   return events;
 }
 
-export function checkEndConditions(state, world) {
+export function checkEndConditions(state, world, shrine) {
   if (state.playerFallen) {
+    state.ended = true;
+    return 'loss';
+  }
+  if (shrine && shrine.hp <= 0) {
+    state.shrineDestroyed = true;
     state.ended = true;
     return 'loss';
   }
