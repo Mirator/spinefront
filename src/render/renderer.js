@@ -1,4 +1,4 @@
-import { AURA, COLORS, ECONOMY, GOLD_BURDEN, SHRINE_TECH } from '../core/constants.js';
+import { AURA, COLORS, ECONOMY, GOLD_BURDEN, SHRINE_TECH, UI_COLORS } from '../core/constants.js';
 import { createRng } from '../core/random.js';
 import { clamp, hexToRgb, lerpColor } from '../systems/math.js';
 
@@ -339,6 +339,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.beginPath();
     ctx.arc(shrine.x + shrine.w / 2, shrine.y + shrine.h / 2, 10, 0, Math.PI * 2);
     ctx.stroke();
+    drawHpBar(shrine);
     ctx.restore();
   }
 
@@ -463,7 +464,8 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.restore();
   }
 
-  function drawJumpPuzzles(puzzles = [], activePuzzle, activeMiniGame, camera, world) {
+  function drawJumpPuzzles(state, camera, world) {
+    const { jumpPuzzles: puzzles, activePuzzle, activeMiniGame } = state;
     if (!puzzles?.length || !world) return;
 
     // Draw inactive puzzles as monoliths
@@ -483,6 +485,32 @@ export function createRenderer({ canvas, colors = COLORS }) {
       const monolithHeight = 100;
       const x = puzzle.x - monolithWidth / 2;
       const topY = world.ground - monolithHeight - 20;
+
+      // Light Beam
+      if (!state.isNight && status !== 'resolved') {
+        const time = performance.now() / 1000;
+        const pulse = 0.5 + Math.sin(time * 3 + puzzle.x) * 0.2;
+        const beamAlpha = (1 - state.skyBlend) * 0.4 * pulse;
+
+        if (beamAlpha > 0.05) {
+          ctx.save();
+          const pX = puzzle.x;
+          const pY = topY;
+          const beamH = pY + 100; // extend up past screen usually
+          const beamGrad = ctx.createLinearGradient(pX, pY, pX, 0);
+          beamGrad.addColorStop(0, `rgba(${hexToRgb(base).r}, ${hexToRgb(base).g}, ${hexToRgb(base).b}, ${beamAlpha})`);
+          beamGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+          ctx.globalCompositeOperation = 'screen';
+          ctx.fillStyle = beamGrad;
+          ctx.fillRect(pX - 20, 0, 40, pY);
+
+          // Core string
+          ctx.fillStyle = `rgba(255, 255, 255, ${beamAlpha * 1.5})`;
+          ctx.fillRect(pX - 1, 0, 2, pY);
+          ctx.restore();
+        }
+      }
 
       ctx.save();
 
@@ -839,6 +867,111 @@ export function createRenderer({ canvas, colors = COLORS }) {
 
     ctx.restore();
 
+    // Wave Timer (Night Only)
+    if (state.isNight && state.waveInterval > 0) {
+      const timerProgress = clamp(state.waveTimer / state.waveInterval, 0, 1);
+      const timerW = 200;
+      const timerH = 8;
+      const timerX = canvas.width / 2 - timerW / 2;
+      const timerY = 32;
+
+      ctx.save();
+      // BG
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+      drawRoundedRect(ctx, timerX, timerY, timerW, timerH, 4);
+      ctx.fill();
+
+      // Fill
+      ctx.fillStyle = UI_COLORS.waveTimerFill; // Purple for waves
+      drawRoundedRect(ctx, timerX, timerY, timerW * timerProgress, timerH, 4);
+      ctx.fill();
+
+      // Text/Icon
+      ctx.font = '600 12px Inter, system-ui, sans-serif';
+      ctx.fillStyle = UI_COLORS.waveTimerText;
+      ctx.textAlign = 'center';
+      ctx.fillText('NEXT WAVE', canvas.width / 2, timerY - 10);
+      ctx.restore();
+    }
+
+    // Objective Banner
+    if (state.hints?.objectiveBanner) {
+      const banner = state.hints.objectiveBanner;
+      const bx = canvas.width / 2;
+      const by = 80;
+      ctx.save();
+      ctx.font = '600 16px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = UI_COLORS.bannerBackground;
+      const textW = ctx.measureText(banner.text).width + 32;
+      drawRoundedRect(ctx, bx - textW / 2, by - 14, textW, 28, 14);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = UI_COLORS.bannerText;
+      ctx.fillText(banner.text, bx, by + 5);
+      ctx.restore();
+    }
+
+    // Active Hint (Tutorial)
+    if (state.hints?.activeHint) {
+      const hint = state.hints.activeHint;
+      // Project world coordinates if needed, but for now we assume hint.x/y are world
+      // HUD is usually screen space. But drawHUD iterates over entities in world space? NO.
+      // drawHUD is screen space?
+      // renderer.js: drawHUD takes snapshot.
+      // drawHUD uses 'player.x' directly?
+      // Let's check 'Contextual Prompts' (lines 907).
+      // const px = player.x + player.w / 2;
+      // const py = player.y - 40;
+      // It uses player.x directly.
+      // BUT `ctx.save()` at start of `drawHUD` implies...
+      // `draw` calls `drawHUD`? No.
+      // `renderer.js` doesn't call `drawHUD`. It's likely called by `main.js` or `index.html`?
+      // Wait, `renderer.js` exports `createRenderer` which returns `draw`.
+      // Where is `drawHUD` called?
+      // It is NOT called in `draw`.
+      // It must be called separately.
+      // Let's check `session.js` or `main.js`.
+      // Ah, I missed checking where `drawHUD` is called.
+      // If `drawHUD` is called with Identity transform, then `player.x` must be projected to screen space.
+      // `player.x` is world space.
+      // `drawHUD` lines 907 use `player.x`.
+      // If `drawHUD` is screen space, then usage of `player.x` without `camera.x` subtraction is WRONG unless `ctx` is translated.
+      // BUT `drawHUD` seems to assume a translation?
+      // Let's check `drawHUD` start (line 768).
+      // No translation seen.
+      // Maybe `drawHUD` is called inside a camera transform?
+      // I need to verify this assumption.
+      // But based on existing code (lines 907), it uses `player.x` directly.
+      // So I will assume `hint.x` (world space) works if I use it like `player.x`.
+
+      ctx.save();
+      ctx.font = '600 14px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      const hx = hint.x;
+      const hy = hint.y;
+
+      // Background
+      const hintW = ctx.measureText(hint.text).width + 24;
+      ctx.fillStyle = UI_COLORS.hintBackground; // Amber for hints
+      drawRoundedRect(ctx, hx - hintW / 2, hy - 14, hintW, 28, 6);
+      ctx.fill();
+
+      // Text
+      ctx.fillStyle = UI_COLORS.hintText;
+      ctx.fillText(hint.text, hx, hy + 5);
+
+      // Arrow/Pointer
+      ctx.beginPath();
+      ctx.moveTo(hx - 6, hy + 14);
+      ctx.lineTo(hx + 6, hy + 14);
+      ctx.lineTo(hx, hy + 20);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Contextual Prompts (Minimalist)
     ctx.save();
     ctx.font = '600 13px Inter, system-ui, sans-serif';
@@ -870,6 +1003,24 @@ export function createRenderer({ canvas, colors = COLORS }) {
       ctx.fill();
       ctx.fillStyle = '#f472b6';
       ctx.fillText(`[E] Claim Reward`, px, py - 8);
+    }
+
+    // Dusk Warning Banner
+    if (state.duskWarning) {
+      const cx = canvas.width / 2;
+      const cy = 100;
+      ctx.save();
+      ctx.font = '900 32px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = UI_COLORS.duskBannerShadow;
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = UI_COLORS.duskBannerTextMain;
+      ctx.fillText('DUSK APPROACHES', cx, cy);
+      ctx.font = '600 14px Inter, system-ui, sans-serif';
+      ctx.fillStyle = UI_COLORS.duskBannerTextSub;
+      ctx.fillText('ENEMIES APPROACHING FROM BOTH SIDES', cx, cy + 26);
+      ctx.restore();
     }
 
     ctx.restore();
@@ -1017,7 +1168,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.save();
 
     // Dramatic Overlay
-    const overlayColor = state.playerFallen ? 'rgba(50, 0, 0, 0.85)' : 'rgba(0, 50, 30, 0.85)';
+    const overlayColor = state.playerFallen ? UI_COLORS.outcomeReviewRed : UI_COLORS.outcomeReviewGreen;
     ctx.fillStyle = overlayColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -1025,8 +1176,8 @@ export function createRenderer({ canvas, colors = COLORS }) {
     const cy = canvas.height / 2;
 
     // Victory/Defeat Title
-    const title = state.playerFallen ? 'DEFEAT' : 'VICTORY';
-    const color = state.playerFallen ? '#f87171' : '#34d399';
+    const title = state.playerFallen || state.shrineDestroyed ? 'DEFEAT' : 'VICTORY';
+    const color = state.playerFallen || state.shrineDestroyed ? UI_COLORS.outcomeDefeat : UI_COLORS.outcomeVictory;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1041,21 +1192,21 @@ export function createRenderer({ canvas, colors = COLORS }) {
     // Subtext
     ctx.shadowBlur = 0;
     ctx.font = '500 24px Inter, system-ui, sans-serif';
-    ctx.fillStyle = '#e5e7eb';
-    const sub = state.playerFallen
-      ? 'Your aura has collapsed.'
-      : 'The dawn has arrived.';
+    ctx.fillStyle = UI_COLORS.outcomeText;
+    let sub = 'The dawn has arrived.';
+    if (state.playerFallen) sub = 'Your aura has collapsed.';
+    if (state.shrineDestroyed) sub = 'The shrine has fallen.';
     ctx.fillText(sub, cx, cy + 20);
 
     // Stats
     ctx.font = '16px Inter, system-ui, sans-serif';
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = UI_COLORS.outcomeStats;
     const stats = `Nights: ${state.nightsSurvived}  •  Gold: ${state.currency}  •  Legacy: ${state.legacy || 0}`;
     ctx.fillText(stats, cx, cy + 60);
 
     // Restart Prompt
     ctx.font = '600 16px Inter, system-ui, sans-serif';
-    ctx.fillStyle = '#fcd34d';
+    ctx.fillStyle = UI_COLORS.outcomeRestart;
     ctx.fillText('Press [R] to Restart', cx, cy + 120);
 
     ctx.restore();
@@ -1179,6 +1330,11 @@ export function createRenderer({ canvas, colors = COLORS }) {
       dusk.addColorStop(0, `rgba(253, 186, 116, ${0.4 * duskStrength})`); // Orange/Peach
       dusk.addColorStop(1, `rgba(129, 140, 248, ${0.3 * duskStrength})`); // Indigo
       ctx.fillStyle = dusk;
+      ctx.fillRect(0, 0, camera.w, camera.h);
+    }
+
+    if (state.duskWarning) {
+      ctx.fillStyle = UI_COLORS.duskTint; // Red tint
       ctx.fillRect(0, 0, camera.w, camera.h);
     }
 
@@ -1325,7 +1481,7 @@ export function createRenderer({ canvas, colors = COLORS }) {
     ctx.translate(-activeCamera.x, -activeCamera.y);
     drawShrine(shrine, state.shrineUnlocked);
     drawStructures(walls, towers, barricades);
-    drawJumpPuzzles(state.jumpPuzzles, state.activePuzzle, state.activeMiniGame, activeCamera, world);
+    drawJumpPuzzles(state, activeCamera, world);
     drawEnemies(enemies);
     drawProjectiles(projectiles);
     drawProjectiles(enemyProjectiles);

@@ -24,6 +24,7 @@ import { applyPlayerAuraHit, updateAuraRecovery } from '../systems/aura.js';
 import { updateDayNight, checkEndConditions } from '../systems/cycle.js';
 import { updateEnemySpawns } from '../systems/spawning.js';
 import { updateJumpPuzzles } from '../systems/puzzles.js';
+import { updateHints } from '../systems/hints.js';
 
 function createSnapshot(store) {
   return {
@@ -208,11 +209,12 @@ export class GameSession {
     }
 
     updateJumpPuzzles(state, this.store.player, this.store.input, world, scaledDt);
+    updateHints(state, this.store.player, world, scaledDt, this.store.shrine);
     updatePlayer(this.store.player, world, scaledDt, this.store.shrine);
     updateCamera(this.store.camera, this.store.player, world);
     resolveEnemyAttacks(
       state.enemies,
-      [...this.store.walls, ...this.store.towers, ...this.store.barricades],
+      [...this.store.walls, ...this.store.towers, ...this.store.barricades, this.store.shrine],
       world,
       scaledDt,
       this.store.rng,
@@ -223,7 +225,7 @@ export class GameSession {
     const projectileResults = updateProjectiles(
       state.projectiles,
       state.enemies,
-      [...this.store.walls, ...this.store.towers, ...this.store.barricades],
+      [...this.store.walls, ...this.store.towers, ...this.store.barricades, this.store.shrine],
       this.store.player,
       world,
       state.effects,
@@ -234,7 +236,7 @@ export class GameSession {
     const hostileProjectiles = updateProjectiles(
       state.enemyProjectiles,
       state.enemies,
-      [...this.store.walls, ...this.store.towers, ...this.store.barricades],
+      [...this.store.walls, ...this.store.towers, ...this.store.barricades, this.store.shrine],
       this.store.player,
       world,
       state.effects,
@@ -256,7 +258,7 @@ export class GameSession {
     this.store.barricades = this.store.barricades.filter((b) => b.hp > 0);
     state.enemies = cleanupEnemies(state.enemies, world);
     updateDayNight(state, world, scaledDt);
-    const outcome = checkEndConditions(state, world);
+    const outcome = checkEndConditions(state, world, this.store.shrine);
     if (outcome === 'loss' && !state.menuOpen) {
       this.transitionMenu('end');
     } else if (outcome === 'ascend' && !state.menuOpen) {
