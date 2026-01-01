@@ -71,4 +71,24 @@ describe('renderer shrine copy', () => {
     const shrinePrompt = fillTextCalls.find((text) => text?.includes('[E] Unlock'));
     expect(shrinePrompt).toContain(`[E] Unlock ${ECONOMY.shrineCost}`);
   });
+
+  it('renders the FPS button', () => {
+    const { canvas, fillTextCalls } = createMockCanvas();
+    const renderer = createRenderer({ canvas });
+    const store = createGameStore({ width: canvas.width, height: canvas.height });
+
+    renderer.render({
+      world: store.world,
+      state: store.state,
+      player: store.player,
+      shrine: store.shrine,
+      walls: store.walls,
+      towers: store.towers,
+      enemies: store.state.enemies,
+      projectiles: store.state.projectiles,
+    });
+
+    const fpsText = fillTextCalls.find((text) => text?.startsWith('FPS:'));
+    expect(fpsText).toBeDefined();
+  });
 });
